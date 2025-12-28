@@ -242,6 +242,10 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type):
         Gini coefficient from fitted curve
     rmse : float
         Root mean squared fractional error
+    mafe : float
+        Mean absolute fractional error
+    max_abs_error : float
+        Maximum absolute fractional error across all bins
     """
     income_shares = np.asarray(income_shares)
     income_shares = income_shares / np.sum(income_shares)
@@ -301,13 +305,28 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type):
     )
     params = tuple(result.x)
 
-    # Calculate RMSE on fractional errors
-    rmse = np.sqrt(objective(params) / n_bins)
+    # Calculate goodness-of-fit statistics
+    fractional_errors = []
+    for i in range(n_bins):
+        p_lower = i / n_bins
+        p_upper = (i + 1) / n_bins
+        L_lower = lorenz_func(p_lower, *params)
+        L_upper = lorenz_func(p_upper, *params)
+        predicted_share = L_upper - L_lower
+        actual_share = income_shares[i]
+        fractional_error = (predicted_share / actual_share) - 1.0
+        fractional_errors.append(fractional_error)
+
+    fractional_errors = np.array(fractional_errors)
+
+    rmse = np.sqrt(np.mean(fractional_errors ** 2))
+    mafe = np.mean(np.abs(fractional_errors))
+    max_abs_error = np.max(np.abs(fractional_errors))
 
     # Calculate Gini coefficient
     gini = gini_from_params(lorenz_func, params)
 
-    return params, lorenz_func, gini, rmse
+    return params, lorenz_func, gini, rmse, mafe, max_abs_error
 
 
 def fit_lorenz_curve(p_data, L_data, lorenz_type):

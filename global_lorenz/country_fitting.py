@@ -132,17 +132,23 @@ def fit_country_lorenz_curves(data_df, income_cols, lorenz_type):
 
         try:
             # Fit Lorenz curve using fractional error objective
-            params, lorenz_func, gini, rmse = fit_lorenz_curve_decile(income_shares, lorenz_type)
+            params, lorenz_func, gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(income_shares, lorenz_type)
 
             result = {
                 'country': country_name,
                 'gini': gini,
                 'rmse': rmse,
+                'mafe': mafe,
+                'max_abs_error': max_abs_error,
             }
 
             # Add parameters
             for i, param in enumerate(params):
                 result[f'param_{i+1}'] = param
+
+            # Add year
+            if 'reporting_year' in row.index:
+                result['year'] = row['reporting_year']
 
             # Add other data if available
             if 'reporting_gdp' in row.index:
@@ -154,6 +160,20 @@ def fit_country_lorenz_curves(data_df, income_cols, lorenz_type):
                 result['population'] = row['reporting_pop']
             elif 'Population' in row.index or 'population' in row.index:
                 result['population'] = row.get('Population', row.get('population'))
+
+            # Add actual income shares
+            n_bins = len(income_shares)
+            for i in range(n_bins):
+                result[f'decile{i+1}_actual'] = income_shares[i]
+
+            # Add fitted income shares
+            for i in range(n_bins):
+                p_lower = i / n_bins
+                p_upper = (i + 1) / n_bins
+                L_lower = lorenz_func(p_lower, *params)
+                L_upper = lorenz_func(p_upper, *params)
+                predicted_share = L_upper - L_lower
+                result[f'decile{i+1}_fitted'] = predicted_share
 
             results.append(result)
 
