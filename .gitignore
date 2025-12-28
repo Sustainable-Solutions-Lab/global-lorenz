@@ -21,6 +21,7 @@ wheels/
 *.egg
 
 # Virtual environments
+.venv/
 venv/
 ENV/
 env/
@@ -35,7 +36,7 @@ env/
 # Output directories
 output/
 output_*/
-data/
+data/output/
 
 # OS
 .DS_Store
