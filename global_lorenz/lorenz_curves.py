@@ -371,12 +371,12 @@ def fit_lorenz_curve(p_data, L_data, lorenz_type):
         initial_guess = [0.5, 0.5, 0.5]
     elif lorenz_type == 'beta_3':
         lorenz_func = lorenz_beta_3
-        bounds = ([0.001, 0.001, 0.001], [0.999, 0.999, 0.999])
+        bounds = ([EPSILON, EPSILON, EPSILON], [1-EPSILON, 1-EPSILON, 1-EPSILON])
         initial_guess = [0.5, 0.5, 0.5]
     elif lorenz_type == 'sarabia_3':
         lorenz_func = lorenz_sarabia_3
-        bounds = ([0.001, 0.001, 1.001], [5.0, 5.0, 5.0])
-        initial_guess = [1.0, 1.0, 1.5]
+        bounds = ([EPSILON, EPSILON, 1+EPSILON], [5.0, 5.0, 5.0])
+        initial_guess = [0.2, 0.66667, 1.33333]
     else:
         raise ValueError(f"Unknown lorenz_type: {lorenz_type}. Must be one of: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3'")
     
