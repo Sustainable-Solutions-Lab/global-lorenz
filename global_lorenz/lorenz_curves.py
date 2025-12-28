@@ -11,6 +11,9 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit
 from scipy.integrate import quad
 
+# Small epsilon for numerical stability in parameter bounds
+EPSILON = 1e-12
+
 
 def lorenz_pareto_1(p, a):
     """
@@ -250,11 +253,11 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type):
     # Select the appropriate Lorenz curve form based on lorenz_type
     if lorenz_type == 'pareto_1':
         lorenz_func = lorenz_pareto_1
-        bounds = ([-1], [1])
-        initial_guess = [0.0]
+        bounds = ([1.0 + EPSILON], [20.0])
+        initial_guess = [2.0]
     elif lorenz_type == 'ortega_2':
         lorenz_func = lorenz_ortega_2
-        bounds = ([0.0, 0.001], [5.0, 1.0])
+        bounds = ([0.0, EPSILON], [5.0, 1.0])
         initial_guess = [1.0, 0.5]
     elif lorenz_type == 'gq_3':
         lorenz_func = lorenz_gq_3
@@ -337,12 +340,12 @@ def fit_lorenz_curve(p_data, L_data, lorenz_type):
     # Select the appropriate Lorenz curve form based on lorenz_type
     if lorenz_type == 'pareto_1':
         lorenz_func = lorenz_pareto_1
-        bounds = ([-1], [1])
-        initial_guess = [0.0]
+        bounds = ([1.0 + EPSILON], [5.0])  # maximum for real data is about 2.5
+        initial_guess = [2.0]
     elif lorenz_type == 'ortega_2':
         lorenz_func = lorenz_ortega_2
-        bounds = ([0.0, 0.001], [5.0, 1.0])
-        initial_guess = [1.0, 0.5]
+        bounds = ([0.0, EPSILON], [1.0, 1.0])
+        initial_guess = [0.33333, 0.66667]
     elif lorenz_type == 'gq_3':
         lorenz_func = lorenz_gq_3
         bounds = ([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0])

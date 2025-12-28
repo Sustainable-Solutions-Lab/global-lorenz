@@ -178,9 +178,8 @@ def run_workflow(input_file, income_cols, lorenz_type):
     print(f"   Median Gini: {country_results['gini'].median():.3f}")
     
     # Save country results
-    n_params = int(lorenz_type.split('_')[1])
-    country_results.to_csv(output_dir / f'country_results_{n_params}param.csv', index=False)
-    print(f"   Saved results to {output_dir / f'country_results_{n_params}param.csv'}")
+    country_results.to_csv(output_dir / f'country_results_{lorenz_type}.csv', index=False)
+    print(f"   Saved results to {output_dir / f'country_results_{lorenz_type}.csv'}")
 
     # Step 3: Plot country curves
     print("\n3. Plotting sample country Lorenz curves...")
@@ -210,7 +209,6 @@ def run_workflow(input_file, income_cols, lorenz_type):
     report.append("GLOBAL LORENZ CURVE FITTING SUMMARY")
     report.append("=" * 70)
     report.append(f"\nLorenz curve type: {lorenz_type}")
-    report.append(f"Number of parameters: {n_params}")
     report.append(f"Number of countries: {len(country_results)}")
     report.append(f"Mean country Gini: {country_results['gini'].mean():.4f}")
     report.append(f"Median country Gini: {country_results['gini'].median():.4f}")
@@ -248,7 +246,7 @@ if __name__ == '__main__':
     print("Testing different Lorenz curve forms")
     print("=" * 70)
     
-    for lorenz_type in ['pareto_1', 'ortega_2', 'gq_3']:
+    for lorenz_type in ['pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3']:
         print(f"\n\nConfiguration: {lorenz_type}")
         print("-" * 70)
 
