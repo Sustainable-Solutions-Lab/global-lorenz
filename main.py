@@ -18,9 +18,9 @@ from global_lorenz import (
     fit_country_lorenz_curves,
     aggregate_global_distribution,
     fit_global_lorenz,
-    lorenz_1param,
-    lorenz_2param,
-    lorenz_3param,
+    lorenz_pareto_1,
+    lorenz_ortega_2,
+    lorenz_gq_3,
 )
 from global_lorenz.country_fitting import read_country_data, filter_most_recent_complete
 
@@ -36,11 +36,11 @@ def plot_lorenz_curves(country_results, n_params, output_dir='output'):
 
     # Select appropriate function
     if n_params == 1:
-        lorenz_func = lorenz_1param
+        lorenz_func = lorenz_pareto_1
     elif n_params == 2:
-        lorenz_func = lorenz_2param
+        lorenz_func = lorenz_ortega_2
     else:
-        lorenz_func = lorenz_3param
+        lorenz_func = lorenz_gq_3
 
     # Plot a few example countries
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -83,12 +83,12 @@ def plot_global_lorenz(p, L, params, n_params, output_dir='output'):
     
     # Select appropriate function
     if n_params == 1:
-        lorenz_func = lorenz_1param
+        lorenz_func = lorenz_pareto_1
     elif n_params == 2:
-        lorenz_func = lorenz_2param
+        lorenz_func = lorenz_ortega_2
     else:
-        lorenz_func = lorenz_3param
-    
+        lorenz_func = lorenz_gq_3
+
     fig, ax = plt.subplots(figsize=(8, 8))
     
     # Plot data points

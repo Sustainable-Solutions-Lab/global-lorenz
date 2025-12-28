@@ -155,7 +155,7 @@ country_results_beta = fit_country_lorenz_curves(
 
 ## Lorenz Curve Forms
 
-### 1-Parameter Form (Pareto Lorenz)
+### 1-Parameter Form: `lorenz_pareto_1` (Pareto Lorenz)
 
 ```
 L(p) = 1 - (1 - p)^(1 - 1/a)
@@ -165,7 +165,7 @@ This is the Pareto distribution Lorenz curve. The Gini index is G = 1/(2a - 1).
 
 **Reference:** https://www.mdpi.com/2225-1146/13/3/30
 
-### 2-Parameter Form (Ortega/Jantzen-Volpert)
+### 2-Parameter Form: `lorenz_ortega_2` (Ortega/Jantzen-Volpert)
 
 ```
 L(p) = p^a · (1 - (1-p)^b)
@@ -182,7 +182,7 @@ This is a flexible form commonly used for income distributions.
 
 The package supports three different 3-parameter Lorenz curve forms:
 
-#### Generalized Quadratic (default for `curve_type='quadratic'`)
+#### `lorenz_gq_3`: Generalized Quadratic (default for `curve_type='quadratic'`)
 
 Solves the implicit equation:
 ```
@@ -195,7 +195,7 @@ This reduces to a quadratic equation in L and selects the solution between 0 and
 - Villasenor, J., and B. Arnold (1989). Elliptical Lorenz curves. Journal of Econometrics, 40, 327–338.
 - https://rpubs.com/tsamuel/709170
 
-#### Sarabia Ordered Family (`curve_type='sarabia'`)
+#### `lorenz_sarabia_3`: Sarabia Ordered Family (`curve_type='sarabia'`)
 
 ```
 L(p) = p^a · (1 - (1-p)^b)^c
@@ -205,7 +205,7 @@ With constraints: a > 0, b > 0, c > 1
 
 **Reference:** Sarabia, J., E. Castillo and D. Slottje (1999). An Ordered Family of Lorenz Curves, Journal of Econometrics, 91, 43-60.
 
-#### Beta Lorenz (`curve_type='beta'`)
+#### `lorenz_beta_3`: Beta Lorenz (`curve_type='beta'`)
 
 ```
 L(p) = p - a · p^b · (1-p)^c

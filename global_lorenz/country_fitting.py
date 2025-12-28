@@ -190,23 +190,23 @@ def evaluate_country_lorenz(row, n_params, income_thresholds, curve_type='quadra
     populations_below : array
         Population fraction below each threshold
     """
-    from .lorenz_curves import lorenz_1param, lorenz_2param, lorenz_3param, lorenz_beta, lorenz_sarabia
+    from .lorenz_curves import lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
 
     # Extract parameters
     params = tuple(row[f'param_{i+1}'] for i in range(n_params))
 
     # Select appropriate function
     if n_params == 1:
-        lorenz_func = lorenz_1param
+        lorenz_func = lorenz_pareto_1
     elif n_params == 2:
-        lorenz_func = lorenz_2param
+        lorenz_func = lorenz_ortega_2
     elif n_params == 3:
         if curve_type == 'beta':
-            lorenz_func = lorenz_beta
+            lorenz_func = lorenz_beta_3
         elif curve_type == 'sarabia':
-            lorenz_func = lorenz_sarabia
+            lorenz_func = lorenz_sarabia_3
         else:
-            lorenz_func = lorenz_3param
+            lorenz_func = lorenz_gq_3
     
     # For each income threshold (as fraction of mean), find the population quantile
     # This requires inverting the derivative of the Lorenz curve

@@ -10,22 +10,22 @@ This package provides tools for:
 __version__ = "0.1.0"
 
 from .lorenz_curves import (
-    lorenz_1param,
-    lorenz_2param,
-    lorenz_3param,
-    lorenz_beta,
-    lorenz_sarabia,
+    lorenz_pareto_1,
+    lorenz_ortega_2,
+    lorenz_gq_3,
+    lorenz_beta_3,
+    lorenz_sarabia_3,
     fit_lorenz_curve,
 )
 from .country_fitting import fit_country_lorenz_curves
 from .global_aggregation import aggregate_global_distribution, fit_global_lorenz
 
 __all__ = [
-    "lorenz_1param",
-    "lorenz_2param",
-    "lorenz_3param",
-    "lorenz_beta",
-    "lorenz_sarabia",
+    "lorenz_pareto_1",
+    "lorenz_ortega_2",
+    "lorenz_gq_3",
+    "lorenz_beta_3",
+    "lorenz_sarabia_3",
     "fit_lorenz_curve",
     "fit_country_lorenz_curves",
     "aggregate_global_distribution",

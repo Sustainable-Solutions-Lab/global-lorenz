@@ -11,7 +11,7 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit
 
 
-def lorenz_1param(p, a):
+def lorenz_pareto_1(p, a):
     """
     1-parameter Lorenz curve (Pareto Lorenz).
 
@@ -38,7 +38,7 @@ def lorenz_1param(p, a):
     return 1 - (1 - p)**(1 - 1/a)
 
 
-def lorenz_2param(p, a, b):
+def lorenz_ortega_2(p, a, b):
     """
     2-parameter Lorenz curve (Ortega/Jantzen-Volpert functional form).
 
@@ -69,7 +69,7 @@ def lorenz_2param(p, a, b):
     return p**a * (1 - (1 - p)**b)
 
 
-def lorenz_3param(p, a, b, c):
+def lorenz_gq_3(p, a, b, c):
     """
     3-parameter Generalized Quadratic Lorenz curve solving the implicit equation:
     L(1-L) = a(p² - L) + bL(p-1) + c(p-L)
@@ -124,7 +124,7 @@ def lorenz_3param(p, a, b, c):
     return L
 
 
-def lorenz_sarabia(p, a, b, c):
+def lorenz_sarabia_3(p, a, b, c):
     """
     Sarabia 3-parameter Lorenz curve (Ordered Family form).
 
@@ -158,7 +158,7 @@ def lorenz_sarabia(p, a, b, c):
     return p**a * (1 - (1 - p)**b)**c
 
 
-def lorenz_beta(p, a, b, c):
+def lorenz_beta_3(p, a, b, c):
     """
     Beta Lorenz curve (3-parameter form).
 
@@ -246,28 +246,28 @@ def fit_lorenz_curve(p_data, L_data, n_params=2, curve_type='quadratic', initial
     """
     # Select the appropriate Lorenz curve form
     if n_params == 1:
-        lorenz_func = lorenz_1param
+        lorenz_func = lorenz_pareto_1
         bounds = ([-1], [1])
         if initial_guess is None:
             initial_guess = [0.0]
     elif n_params == 2:
-        lorenz_func = lorenz_2param
+        lorenz_func = lorenz_ortega_2
         bounds = ([0.0, 0.001], [5.0, 1.0])
         if initial_guess is None:
             initial_guess = [1.0, 0.5]
     elif n_params == 3:
         if curve_type == 'beta':
-            lorenz_func = lorenz_beta
+            lorenz_func = lorenz_beta_3
             bounds = ([0.001, 0.001, 0.001], [0.999, 0.999, 0.999])
             if initial_guess is None:
                 initial_guess = [0.5, 0.5, 0.5]
         elif curve_type == 'sarabia':
-            lorenz_func = lorenz_sarabia
+            lorenz_func = lorenz_sarabia_3
             bounds = ([0.001, 0.001, 1.001], [5.0, 5.0, 5.0])
             if initial_guess is None:
                 initial_guess = [1.0, 1.0, 1.5]
         else:
-            lorenz_func = lorenz_3param
+            lorenz_func = lorenz_gq_3
             bounds = ([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0])
             if initial_guess is None:
                 initial_guess = [0.0, 0.0, 0.0]

@@ -7,7 +7,7 @@ income distribution and fits a global Lorenz curve.
 
 import numpy as np
 import pandas as pd
-from .lorenz_curves import fit_lorenz_curve, lorenz_1param, lorenz_2param, lorenz_3param, lorenz_beta, lorenz_sarabia
+from .lorenz_curves import fit_lorenz_curve, lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
 
 
 def aggregate_global_distribution(country_results, n_params,
