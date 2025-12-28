@@ -123,31 +123,97 @@ global_params, global_lorenz_func, global_gini, global_data = fit_global_lorenz(
 print(f"Global Gini coefficient: {global_gini:.4f}")
 ```
 
+### Using Different Curve Forms
+
+For 3-parameter fits, you can choose between three different forms:
+
+```python
+# Fit using Generalized Quadratic (implicit equation) - default
+country_results_gq = fit_country_lorenz_curves(
+    data_df,
+    income_cols,
+    n_params=3,
+    curve_type='quadratic'
+)
+
+# Fit using Sarabia Ordered Family curve
+country_results_sarabia = fit_country_lorenz_curves(
+    data_df,
+    income_cols,
+    n_params=3,
+    curve_type='sarabia'
+)
+
+# Fit using Beta Lorenz curve
+country_results_beta = fit_country_lorenz_curves(
+    data_df,
+    income_cols,
+    n_params=3,
+    curve_type='beta'
+)
+```
+
 ## Lorenz Curve Forms
 
-### 1-Parameter Form (General Quadratic)
+### 1-Parameter Form (Pareto Lorenz)
 
 ```
-L(p) = p + a·p·(1-p)
+L(p) = 1 - (1 - p)^(1 - 1/a)
 ```
 
-This is a simple quadratic form suitable for symmetric distributions.
+This is the Pareto distribution Lorenz curve. The Gini index is G = 1/(2a - 1).
 
-### 2-Parameter Form (Pareto-based)
+**Reference:** https://www.mdpi.com/2225-1146/13/3/30
+
+### 2-Parameter Form (Ortega/Jantzen-Volpert)
 
 ```
-L(p) = 1 - (1 - p^a)^b
+L(p) = p^a · (1 - (1-p)^b)
 ```
 
-This form is more flexible and commonly used for income distributions.
+Constraints: a >= 0, 0 < b <= 1
 
-### 3-Parameter Form (Generalized)
+This is a flexible form commonly used for income distributions.
+
+**References:**
+- Ortega, P., M.A. Fernández, M. Ladoux, A. García (1991). A new functional form for estimating Lorenz curves. Review of Income and Wealth, 37, 447-452.
+
+### 3-Parameter Forms
+
+The package supports three different 3-parameter Lorenz curve forms:
+
+#### Generalized Quadratic (default for `curve_type='quadratic'`)
+
+Solves the implicit equation:
+```
+L(1-L) = a(p² - L) + bL(p-1) + c(p-L)
+```
+
+This reduces to a quadratic equation in L and selects the solution between 0 and 1.
+
+**References:**
+- Villasenor, J., and B. Arnold (1989). Elliptical Lorenz curves. Journal of Econometrics, 40, 327–338.
+- https://rpubs.com/tsamuel/709170
+
+#### Sarabia Ordered Family (`curve_type='sarabia'`)
 
 ```
 L(p) = p^a · (1 - (1-p)^b)^c
 ```
 
-This is the most flexible form, suitable for complex distributions.
+With constraints: a > 0, b > 0, c > 1
+
+**Reference:** Sarabia, J., E. Castillo and D. Slottje (1999). An Ordered Family of Lorenz Curves, Journal of Econometrics, 91, 43-60.
+
+#### Beta Lorenz (`curve_type='beta'`)
+
+```
+L(p) = p - a · p^b · (1-p)^c
+```
+
+With constraints: 0 < a, b, c < 1
+
+**Reference:** Kakwani, N. (1980). On a Class of Poverty Measures, Econometrica, 48, 437–446.
 
 ## Output
 
@@ -198,6 +264,11 @@ See `examples/` directory for:
 
 - Lorenz, M. O. (1905). Methods of measuring the concentration of wealth. *Publications of the American Statistical Association*, 9(70), 209-219.
 - Gastwirth, J. L. (1972). The estimation of the Lorenz curve and Gini index. *The Review of Economics and Statistics*, 306-316.
+- Villasenor, J., and B. Arnold (1989). Elliptical Lorenz curves. *Journal of Econometrics*, 40, 327–338.
+- Ortega, P., M.A. Fernández, M. Ladoux, A. García (1991). A new functional form for estimating Lorenz curves. *Review of Income and Wealth*, 37, 447-452.
+- Sarabia, J., E. Castillo and D. Slottje (1999). An Ordered Family of Lorenz Curves. *Journal of Econometrics*, 91, 43-60.
+- Kakwani, N. (1980). On a Class of Poverty Measures. *Econometrica*, 48, 437–446.
+- Hajargasht, G. & Griffiths, W. E. (2022). Pareto-Lorenz Curves (survey of Lorenz curve forms including generalized quadratic and beta). https://fbe.unimelb.edu.au/__data/assets/pdf_file/0006/1965867/2022HajargashtGrifffiths.pdf
 - World Bank. (2023). World Development Indicators.
 
 ## License

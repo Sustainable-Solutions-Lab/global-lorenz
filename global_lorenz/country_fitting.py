@@ -99,10 +99,10 @@ def prepare_lorenz_data(income_shares):
     return p, L
 
 
-def fit_country_lorenz_curves(data_df, income_cols, n_params=2):
+def fit_country_lorenz_curves(data_df, income_cols, n_params=2, curve_type='quadratic'):
     """
     Fit Lorenz curves to all countries in the dataset.
-    
+
     Parameters:
     -----------
     data_df : pandas DataFrame
@@ -111,14 +111,16 @@ def fit_country_lorenz_curves(data_df, income_cols, n_params=2):
         Column names containing income distribution data (in order)
     n_params : int
         Number of parameters for Lorenz curve (1, 2, or 3)
-    
+    curve_type : str
+        For n_params=3, select 'quadratic' (implicit quadratic), 'beta' (Kakwani beta), or 'sarabia' (ordered family)
+
     Returns:
     --------
     results : pandas DataFrame
         DataFrame with fitted parameters, Gini coefficients, and fit quality
     """
     results = []
-    
+
     for idx, row in data_df.iterrows():
         country_name = row.get('country_name', row.get('Country', row.get('country', f'Country_{idx}')))
 
@@ -135,7 +137,7 @@ def fit_country_lorenz_curves(data_df, income_cols, n_params=2):
 
         try:
             # Fit Lorenz curve
-            params, lorenz_func, gini, rmse = fit_lorenz_curve(p, L, n_params=n_params)
+            params, lorenz_func, gini, rmse = fit_lorenz_curve(p, L, n_params=n_params, curve_type=curve_type)
 
             result = {
                 'country': country_name,
@@ -168,10 +170,10 @@ def fit_country_lorenz_curves(data_df, income_cols, n_params=2):
     return results_df
 
 
-def evaluate_country_lorenz(row, n_params, income_thresholds):
+def evaluate_country_lorenz(row, n_params, income_thresholds, curve_type='quadratic'):
     """
     Evaluate a fitted country Lorenz curve at specific income thresholds.
-    
+
     Parameters:
     -----------
     row : pandas Series
@@ -180,24 +182,31 @@ def evaluate_country_lorenz(row, n_params, income_thresholds):
         Number of parameters
     income_thresholds : array_like
         Income levels at which to evaluate (in units of mean income)
-    
+    curve_type : str
+        For n_params=3: 'quadratic' or 'beta'
+
     Returns:
     --------
     populations_below : array
         Population fraction below each threshold
     """
-    from .lorenz_curves import lorenz_1param, lorenz_2param, lorenz_3param
-    
+    from .lorenz_curves import lorenz_1param, lorenz_2param, lorenz_3param, lorenz_beta, lorenz_sarabia
+
     # Extract parameters
     params = tuple(row[f'param_{i+1}'] for i in range(n_params))
-    
+
     # Select appropriate function
     if n_params == 1:
         lorenz_func = lorenz_1param
     elif n_params == 2:
         lorenz_func = lorenz_2param
-    else:
-        lorenz_func = lorenz_3param
+    elif n_params == 3:
+        if curve_type == 'beta':
+            lorenz_func = lorenz_beta
+        elif curve_type == 'sarabia':
+            lorenz_func = lorenz_sarabia
+        else:
+            lorenz_func = lorenz_3param
     
     # For each income threshold (as fraction of mean), find the population quantile
     # This requires inverting the derivative of the Lorenz curve

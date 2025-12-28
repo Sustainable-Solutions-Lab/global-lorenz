@@ -7,24 +7,27 @@ income distribution and fits a global Lorenz curve.
 
 import numpy as np
 import pandas as pd
-from .lorenz_curves import fit_lorenz_curve, lorenz_1param, lorenz_2param, lorenz_3param
+from .lorenz_curves import fit_lorenz_curve, lorenz_1param, lorenz_2param, lorenz_3param, lorenz_beta, lorenz_sarabia
 
 
-def aggregate_global_distribution(country_results, n_params, 
+def aggregate_global_distribution(country_results, n_params,
+                                   curve_type='quadratic',
                                    income_thresholds=None,
                                    gdp_col='gdp', pop_col='population'):
     """
     Aggregate country-level distributions to create global distribution.
-    
+
     This function determines how many people worldwide have income below
     various threshold levels by using the fitted country-level Lorenz curves.
-    
+
     Parameters:
     -----------
     country_results : pandas DataFrame
         Results from fit_country_lorenz_curves with parameters, GDP, and population
     n_params : int
         Number of parameters used in country fits
+    curve_type : str
+        For n_params=3: 'quadratic', 'beta', or 'sarabia'
     income_thresholds : array_like, optional
         Income levels to evaluate (in PPP dollars/year)
         If None, creates a range from min to max
@@ -32,7 +35,7 @@ def aggregate_global_distribution(country_results, n_params,
         Column name for GDP data
     pop_col : str
         Column name for population data
-    
+
     Returns:
     --------
     global_data : pandas DataFrame
@@ -67,7 +70,7 @@ def aggregate_global_distribution(country_results, n_params,
         
         # Get population fractions below each threshold for this country
         try:
-            pop_fractions = evaluate_country_lorenz(row, n_params, threshold_fractions)
+            pop_fractions = evaluate_country_lorenz(row, n_params, threshold_fractions, curve_type)
             
             # Convert to absolute numbers and add to global total
             country_pop = row[pop_col]
@@ -148,10 +151,11 @@ def global_distribution_to_lorenz(global_data):
 
 
 def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
+                     curve_type_country='quadratic', curve_type_global='quadratic',
                      income_thresholds=None):
     """
     Fit a global Lorenz curve from country-level data.
-    
+
     Parameters:
     -----------
     country_results : pandas DataFrame
@@ -160,9 +164,13 @@ def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
         Number of parameters used in country-level fits
     n_params_global : int
         Number of parameters for global Lorenz curve (1, 2, or 3)
+    curve_type_country : str
+        For n_params_country=3: 'quadratic', 'beta', or 'sarabia'
+    curve_type_global : str
+        For n_params_global=3: 'quadratic', 'beta', or 'sarabia'
     income_thresholds : array_like, optional
         Income levels to evaluate for aggregation
-    
+
     Returns:
     --------
     global_params : tuple
@@ -178,15 +186,16 @@ def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
     global_data = aggregate_global_distribution(
         country_results,
         n_params_country,
+        curve_type=curve_type_country,
         income_thresholds=income_thresholds
     )
-    
+
     # Convert to Lorenz curve format
     p, L = global_distribution_to_lorenz(global_data)
-    
+
     # Fit global Lorenz curve
     global_params, global_lorenz_func, global_gini, rmse = fit_lorenz_curve(
-        p, L, n_params=n_params_global
+        p, L, n_params=n_params_global, curve_type=curve_type_global
     )
     
     print(f"Global Lorenz curve fitted with {n_params_global} parameters")

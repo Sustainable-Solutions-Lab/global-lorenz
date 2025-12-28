@@ -30,10 +30,10 @@ def plot_lorenz_curves(country_results, n_params, output_dir='output'):
     Plot sample country Lorenz curves.
     """
     from global_lorenz.country_fitting import prepare_lorenz_data
-    
+
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
-    
+
     # Select appropriate function
     if n_params == 1:
         lorenz_func = lorenz_1param
@@ -41,17 +41,17 @@ def plot_lorenz_curves(country_results, n_params, output_dir='output'):
         lorenz_func = lorenz_2param
     else:
         lorenz_func = lorenz_3param
-    
+
     # Plot a few example countries
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     axes = axes.flatten()
-    
+
     for i, (idx, row) in enumerate(country_results.head(4).iterrows()):
         ax = axes[i]
-        
+
         # Get parameters
         params = tuple(row[f'param_{j+1}'] for j in range(n_params))
-        
+
         # Plot fitted curve
         p = np.linspace(0, 1, 100)
         L = lorenz_func(p, *params)
@@ -117,12 +117,13 @@ def plot_global_lorenz(p, L, params, n_params, output_dir='output'):
     print(f"Saved global Lorenz curve to {output_dir / 'global_lorenz_curve.png'}")
 
 
-def run_workflow(input_file, income_cols, 
+def run_workflow(input_file, income_cols,
                  n_params_country=2, n_params_global=2,
+                 curve_type_country='quadratic', curve_type_global='quadratic',
                  output_dir='output'):
     """
     Run the complete workflow.
-    
+
     Parameters:
     -----------
     input_file : str
@@ -133,16 +134,20 @@ def run_workflow(input_file, income_cols,
         Number of parameters for country-level fits (1, 2, or 3)
     n_params_global : int
         Number of parameters for global fit (1, 2, or 3)
+    curve_type_country : str
+        For n_params_country=3: 'quadratic', 'beta', or 'sarabia'
+    curve_type_global : str
+        For n_params_global=3: 'quadratic', 'beta', or 'sarabia'
     output_dir : str
         Directory for output files
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
-    
+
     print("=" * 70)
     print("Global Lorenz Curve Fitting Workflow")
     print("=" * 70)
-    
+
     # Step 1: Load data
     print("\n1. Loading country data...")
     raw_data = read_country_data(input_file)
@@ -151,10 +156,17 @@ def run_workflow(input_file, income_cols,
     # Filter to most recent complete data per country
     data_df = filter_most_recent_complete(raw_data, income_cols)
     print(f"   Filtered to {len(data_df)} countries with most recent complete data")
-    
+
     # Step 2: Fit country-level Lorenz curves
-    print(f"\n2. Fitting {n_params_country}-parameter Lorenz curves at country level...")
-    country_results = fit_country_lorenz_curves(data_df, income_cols, n_params=n_params_country)
+    curve_desc = f"{n_params_country}-parameter"
+    if n_params_country == 3:
+        curve_desc += f" ({curve_type_country})"
+    print(f"\n2. Fitting {curve_desc} Lorenz curves at country level...")
+    country_results = fit_country_lorenz_curves(
+        data_df, income_cols,
+        n_params=n_params_country,
+        curve_type=curve_type_country
+    )
     print(f"   Successfully fitted {len(country_results)} countries")
     print(f"   Mean Gini: {country_results['gini'].mean():.3f}")
     print(f"   Median Gini: {country_results['gini'].median():.3f}")
