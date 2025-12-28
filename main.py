@@ -9,6 +9,9 @@ This script demonstrates the complete workflow:
 5. Generate visualizations and reports
 """
 
+import sys
+import traceback
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -22,25 +25,30 @@ from global_lorenz import (
     lorenz_ortega_2,
     lorenz_gq_3,
 )
-from global_lorenz.country_fitting import read_country_data, filter_most_recent_complete
+from global_lorenz.country_fitting import read_country_data, filter_most_recent_complete, prepare_lorenz_data
+from global_lorenz.global_aggregation import global_distribution_to_lorenz
 
 
-def plot_lorenz_curves(country_results, n_params, output_dir='output'):
+def plot_lorenz_curves(country_results, lorenz_type, output_dir):
     """
     Plot sample country Lorenz curves.
     """
-    from global_lorenz.country_fitting import prepare_lorenz_data
-
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
 
-    # Select appropriate function
-    if n_params == 1:
+    # Select appropriate function based on lorenz_type
+    if lorenz_type == 'pareto_1':
         lorenz_func = lorenz_pareto_1
-    elif n_params == 2:
+    elif lorenz_type == 'ortega_2':
         lorenz_func = lorenz_ortega_2
-    else:
+    elif lorenz_type == 'gq_3':
         lorenz_func = lorenz_gq_3
+    elif lorenz_type == 'beta_3':
+        lorenz_func = lorenz_beta_3
+    elif lorenz_type == 'sarabia_3':
+        lorenz_func = lorenz_sarabia_3
+
+    n_params = int(lorenz_type.split('_')[1])
 
     # Plot a few example countries
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -74,20 +82,24 @@ def plot_lorenz_curves(country_results, n_params, output_dir='output'):
     print(f"Saved country Lorenz curves to {output_dir / 'country_lorenz_curves.png'}")
 
 
-def plot_global_lorenz(p, L, params, n_params, output_dir='output'):
+def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     """
     Plot global Lorenz curve.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
-    
-    # Select appropriate function
-    if n_params == 1:
+
+    # Select appropriate function based on lorenz_type
+    if lorenz_type == 'pareto_1':
         lorenz_func = lorenz_pareto_1
-    elif n_params == 2:
+    elif lorenz_type == 'ortega_2':
         lorenz_func = lorenz_ortega_2
-    else:
+    elif lorenz_type == 'gq_3':
         lorenz_func = lorenz_gq_3
+    elif lorenz_type == 'beta_3':
+        lorenz_func = lorenz_beta_3
+    elif lorenz_type == 'sarabia_3':
+        lorenz_func = lorenz_sarabia_3
 
     fig, ax = plt.subplots(figsize=(8, 8))
     
@@ -117,10 +129,7 @@ def plot_global_lorenz(p, L, params, n_params, output_dir='output'):
     print(f"Saved global Lorenz curve to {output_dir / 'global_lorenz_curve.png'}")
 
 
-def run_workflow(input_file, income_cols,
-                 n_params_country=2, n_params_global=2,
-                 curve_type_country='quadratic', curve_type_global='quadratic',
-                 output_dir='output'):
+def run_workflow(input_file, income_cols, lorenz_type):
     """
     Run the complete workflow.
 
@@ -130,19 +139,19 @@ def run_workflow(input_file, income_cols,
         Path to Excel file with country data
     income_cols : list
         Column names for income distribution data
-    n_params_country : int
-        Number of parameters for country-level fits (1, 2, or 3)
-    n_params_global : int
-        Number of parameters for global fit (1, 2, or 3)
-    curve_type_country : str
-        For n_params_country=3: 'quadratic', 'beta', or 'sarabia'
-    curve_type_global : str
-        For n_params_global=3: 'quadratic', 'beta', or 'sarabia'
-    output_dir : str
-        Directory for output files
+    lorenz_type : str
+        Type of Lorenz curve function (function name without 'lorenz_' prefix).
+        Options:
+        - 'pareto_1': 1-parameter Pareto Lorenz
+        - 'ortega_2': 2-parameter Ortega/Jantzen-Volpert
+        - 'gq_3': 3-parameter generalized quadratic
+        - 'beta_3': 3-parameter Kakwani beta
+        - 'sarabia_3': 3-parameter Sarabia ordered family
     """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(exist_ok=True)
+    # Create timestamped output directory
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_dir = Path('data/output') / f"{lorenz_type}_{timestamp}"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
     print("Global Lorenz Curve Fitting Workflow")
@@ -158,44 +167,41 @@ def run_workflow(input_file, income_cols,
     print(f"   Filtered to {len(data_df)} countries with most recent complete data")
 
     # Step 2: Fit country-level Lorenz curves
-    curve_desc = f"{n_params_country}-parameter"
-    if n_params_country == 3:
-        curve_desc += f" ({curve_type_country})"
-    print(f"\n2. Fitting {curve_desc} Lorenz curves at country level...")
+    print(f"\n2. Fitting {lorenz_type} Lorenz curves at country level...")
     country_results = fit_country_lorenz_curves(
-        data_df, income_cols,
-        n_params=n_params_country,
-        curve_type=curve_type_country
+        data_df,
+        income_cols,
+        lorenz_type,
     )
     print(f"   Successfully fitted {len(country_results)} countries")
     print(f"   Mean Gini: {country_results['gini'].mean():.3f}")
     print(f"   Median Gini: {country_results['gini'].median():.3f}")
     
     # Save country results
-    country_results.to_csv(output_dir / f'country_results_{n_params_country}param.csv', index=False)
-    print(f"   Saved results to {output_dir / f'country_results_{n_params_country}param.csv'}")
-    
+    n_params = int(lorenz_type.split('_')[1])
+    country_results.to_csv(output_dir / f'country_results_{n_params}param.csv', index=False)
+    print(f"   Saved results to {output_dir / f'country_results_{n_params}param.csv'}")
+
     # Step 3: Plot country curves
     print("\n3. Plotting sample country Lorenz curves...")
-    plot_lorenz_curves(country_results, n_params_country, output_dir)
+    plot_lorenz_curves(country_results, lorenz_type, output_dir)
     
     # Step 4: Aggregate to global distribution
     print(f"\n4. Aggregating to global distribution...")
     global_params, global_lorenz_func, global_gini, global_data = fit_global_lorenz(
         country_results,
-        n_params_country,
-        n_params_global,
+        lorenz_type,
+        None,
     )
-    
+
     # Save global data
     global_data.to_csv(output_dir / 'global_distribution.csv', index=False)
     print(f"   Saved global distribution to {output_dir / 'global_distribution.csv'}")
-    
+
     # Step 5: Plot global Lorenz curve
     print("\n5. Plotting global Lorenz curve...")
-    from global_lorenz.global_aggregation import global_distribution_to_lorenz
     p, L = global_distribution_to_lorenz(global_data)
-    plot_global_lorenz(p, L, global_params, n_params_global, output_dir)
+    plot_global_lorenz(p, L, global_params, lorenz_type, output_dir)
     
     # Step 6: Generate summary report
     print("\n6. Generating summary report...")
@@ -203,12 +209,12 @@ def run_workflow(input_file, income_cols,
     report.append("=" * 70)
     report.append("GLOBAL LORENZ CURVE FITTING SUMMARY")
     report.append("=" * 70)
-    report.append(f"\nCountry-level fits: {n_params_country} parameters")
+    report.append(f"\nLorenz curve type: {lorenz_type}")
+    report.append(f"Number of parameters: {n_params}")
     report.append(f"Number of countries: {len(country_results)}")
     report.append(f"Mean country Gini: {country_results['gini'].mean():.4f}")
     report.append(f"Median country Gini: {country_results['gini'].median():.4f}")
-    report.append(f"\nGlobal fit: {n_params_global} parameters")
-    report.append(f"Global Gini coefficient: {global_gini:.4f}")
+    report.append(f"\nGlobal Gini coefficient: {global_gini:.4f}")
     report.append(f"\nGlobal Lorenz curve parameters:")
     for i, param in enumerate(global_params):
         report.append(f"  Parameter {i+1}: {param:.6f}")
@@ -226,8 +232,6 @@ def run_workflow(input_file, income_cols,
 
 
 if __name__ == '__main__':
-    import sys
-
     if len(sys.argv) < 2:
         print("Usage: python main.py <input_file>")
         print("\nExample: python main.py data/input/pip_2025-12-28.xlsx")
@@ -244,19 +248,16 @@ if __name__ == '__main__':
     print("Testing different Lorenz curve forms")
     print("=" * 70)
     
-    for n_country, n_global in [(1, 1), (2, 2), (3, 3)]:
-        print(f"\n\nConfiguration: {n_country}-param country, {n_global}-param global")
+    for lorenz_type in ['pareto_1', 'ortega_2', 'gq_3']:
+        print(f"\n\nConfiguration: {lorenz_type}")
         print("-" * 70)
-        
+
         try:
             run_workflow(
                 input_file,
                 income_cols,
-                n_params_country=n_country,
-                n_params_global=n_global,
-                output_dir=f'output_{n_country}param'
+                lorenz_type,
             )
         except Exception as e:
-            print(f"Error with configuration ({n_country}, {n_global}): {e}")
-            import traceback
+            print(f"Error with configuration {lorenz_type}: {e}")
             traceback.print_exc()

@@ -110,14 +110,14 @@ data_df = filter_most_recent_complete(raw_data, income_cols)
 country_results = fit_country_lorenz_curves(
     data_df,
     income_cols,
-    n_params=2
+    'ortega_2'
 )
 
 # Fit global Lorenz curve
 global_params, global_lorenz_func, global_gini, global_data = fit_global_lorenz(
     country_results,
-    n_params_country=2,
-    n_params_global=2
+    'ortega_2',
+    None
 )
 
 print(f"Global Gini coefficient: {global_gini:.4f}")
@@ -128,28 +128,25 @@ print(f"Global Gini coefficient: {global_gini:.4f}")
 For 3-parameter fits, you can choose between three different forms:
 
 ```python
-# Fit using Generalized Quadratic (implicit equation) - default
+# Fit using Generalized Quadratic (implicit equation)
 country_results_gq = fit_country_lorenz_curves(
     data_df,
     income_cols,
-    n_params=3,
-    curve_type='quadratic'
+    'gq_3'
 )
 
 # Fit using Sarabia Ordered Family curve
 country_results_sarabia = fit_country_lorenz_curves(
     data_df,
     income_cols,
-    n_params=3,
-    curve_type='sarabia'
+    'sarabia_3'
 )
 
 # Fit using Beta Lorenz curve
 country_results_beta = fit_country_lorenz_curves(
     data_df,
     income_cols,
-    n_params=3,
-    curve_type='beta'
+    'beta_3'
 )
 ```
 
@@ -182,7 +179,7 @@ This is a flexible form commonly used for income distributions.
 
 The package supports three different 3-parameter Lorenz curve forms:
 
-#### `lorenz_gq_3`: Generalized Quadratic (default for `curve_type='quadratic'`)
+#### `lorenz_gq_3`: Generalized Quadratic (selected with `lorenz_type='gq_3'`)
 
 Solves the implicit equation:
 ```
@@ -195,7 +192,7 @@ This reduces to a quadratic equation in L and selects the solution between 0 and
 - Villasenor, J., and B. Arnold (1989). Elliptical Lorenz curves. Journal of Econometrics, 40, 327–338.
 - https://rpubs.com/tsamuel/709170
 
-#### `lorenz_sarabia_3`: Sarabia Ordered Family (`curve_type='sarabia'`)
+#### `lorenz_sarabia_3`: Sarabia Ordered Family (selected with `lorenz_type='sarabia_3'`)
 
 ```
 L(p) = p^a · (1 - (1-p)^b)^c
@@ -205,7 +202,7 @@ With constraints: a > 0, b > 0, c > 1
 
 **Reference:** Sarabia, J., E. Castillo and D. Slottje (1999). An Ordered Family of Lorenz Curves, Journal of Econometrics, 91, 43-60.
 
-#### `lorenz_beta_3`: Beta Lorenz (`curve_type='beta'`)
+#### `lorenz_beta_3`: Beta Lorenz (selected with `lorenz_type='beta_3'`)
 
 ```
 L(p) = p - a · p^b · (1-p)^c

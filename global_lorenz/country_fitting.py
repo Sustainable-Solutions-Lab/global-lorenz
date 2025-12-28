@@ -7,7 +7,7 @@ fitting Lorenz curves to each country.
 
 import numpy as np
 import pandas as pd
-from .lorenz_curves import fit_lorenz_curve
+from .lorenz_curves import fit_lorenz_curve_decile, lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
 
 
 def read_country_data(filepath):
@@ -99,7 +99,7 @@ def prepare_lorenz_data(income_shares):
     return p, L
 
 
-def fit_country_lorenz_curves(data_df, income_cols, n_params=2, curve_type='quadratic'):
+def fit_country_lorenz_curves(data_df, income_cols, lorenz_type):
     """
     Fit Lorenz curves to all countries in the dataset.
 
@@ -109,10 +109,8 @@ def fit_country_lorenz_curves(data_df, income_cols, n_params=2, curve_type='quad
         Country-level data
     income_cols : list
         Column names containing income distribution data (in order)
-    n_params : int
-        Number of parameters for Lorenz curve (1, 2, or 3)
-    curve_type : str
-        For n_params=3, select 'quadratic' (implicit quadratic), 'beta' (Kakwani beta), or 'sarabia' (ordered family)
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
 
     Returns:
     --------
@@ -132,12 +130,9 @@ def fit_country_lorenz_curves(data_df, income_cols, n_params=2, curve_type='quad
             print(f"Skipping {country_name}: missing income data")
             continue
 
-        # Convert to Lorenz curve data
-        p, L = prepare_lorenz_data(income_shares)
-
         try:
-            # Fit Lorenz curve
-            params, lorenz_func, gini, rmse = fit_lorenz_curve(p, L, n_params=n_params, curve_type=curve_type)
+            # Fit Lorenz curve using fractional error objective
+            params, lorenz_func, gini, rmse = fit_lorenz_curve_decile(income_shares, lorenz_type)
 
             result = {
                 'country': country_name,
@@ -170,7 +165,7 @@ def fit_country_lorenz_curves(data_df, income_cols, n_params=2, curve_type='quad
     return results_df
 
 
-def evaluate_country_lorenz(row, n_params, income_thresholds, curve_type='quadratic'):
+def evaluate_country_lorenz(row, income_thresholds, lorenz_type):
     """
     Evaluate a fitted country Lorenz curve at specific income thresholds.
 
@@ -178,35 +173,35 @@ def evaluate_country_lorenz(row, n_params, income_thresholds, curve_type='quadra
     -----------
     row : pandas Series
         Row from fitted results containing parameters
-    n_params : int
-        Number of parameters
     income_thresholds : array_like
         Income levels at which to evaluate (in units of mean income)
-    curve_type : str
-        For n_params=3: 'quadratic' or 'beta'
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
 
     Returns:
     --------
     populations_below : array
         Population fraction below each threshold
     """
-    from .lorenz_curves import lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
+    # Extract n_params from lorenz_type
+    n_params = int(lorenz_type.split('_')[1])
 
     # Extract parameters
     params = tuple(row[f'param_{i+1}'] for i in range(n_params))
 
-    # Select appropriate function
-    if n_params == 1:
+    # Select appropriate function based on lorenz_type
+    if lorenz_type == 'pareto_1':
         lorenz_func = lorenz_pareto_1
-    elif n_params == 2:
+    elif lorenz_type == 'ortega_2':
         lorenz_func = lorenz_ortega_2
-    elif n_params == 3:
-        if curve_type == 'beta':
-            lorenz_func = lorenz_beta_3
-        elif curve_type == 'sarabia':
-            lorenz_func = lorenz_sarabia_3
-        else:
-            lorenz_func = lorenz_gq_3
+    elif lorenz_type == 'gq_3':
+        lorenz_func = lorenz_gq_3
+    elif lorenz_type == 'beta_3':
+        lorenz_func = lorenz_beta_3
+    elif lorenz_type == 'sarabia_3':
+        lorenz_func = lorenz_sarabia_3
+    else:
+        raise ValueError(f"Unknown lorenz_type: {lorenz_type}")
     
     # For each income threshold (as fraction of mean), find the population quantile
     # This requires inverting the derivative of the Lorenz curve

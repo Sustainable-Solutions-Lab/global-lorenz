@@ -9,6 +9,7 @@ This module provides three different functional forms for Lorenz curves:
 
 import numpy as np
 from scipy.optimize import minimize, curve_fit
+from scipy.integrate import quad
 
 
 def lorenz_pareto_1(p, a):
@@ -205,8 +206,6 @@ def gini_from_params(lorenz_func, params):
     gini : float
         Gini coefficient
     """
-    from scipy.integrate import quad
-    
     def integrand(p):
         return lorenz_func(p, *params)
     
@@ -215,7 +214,100 @@ def gini_from_params(lorenz_func, params):
     return gini
 
 
-def fit_lorenz_curve(p_data, L_data, n_params=2, curve_type='quadratic', initial_guess=None):
+def fit_lorenz_curve_decile(income_shares, lorenz_type):
+    """
+    Fit a Lorenz curve to decile income share data using squared fractional error objective.
+
+    Minimizes sum over N=1 to num_deciles of: ((L(N/num_deciles) - L((N-1)/num_deciles)) / share_N - 1)^2
+
+    This objective function gives equal weight to all deciles regardless of their absolute size.
+
+    Parameters:
+    -----------
+    income_shares : array_like
+        Income shares for each decile/bin (should sum to approximately 1)
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
+
+    Returns:
+    --------
+    params : tuple
+        Fitted parameters
+    lorenz_func : callable
+        The fitted Lorenz curve function
+    gini : float
+        Gini coefficient from fitted curve
+    rmse : float
+        Root mean squared fractional error
+    """
+    income_shares = np.asarray(income_shares)
+    income_shares = income_shares / np.sum(income_shares)
+    n_bins = len(income_shares)
+
+    # Extract n_params from lorenz_type
+    n_params = int(lorenz_type.split('_')[1])
+
+    # Select the appropriate Lorenz curve form based on lorenz_type
+    if lorenz_type == 'pareto_1':
+        lorenz_func = lorenz_pareto_1
+        bounds = ([-1], [1])
+        initial_guess = [0.0]
+    elif lorenz_type == 'ortega_2':
+        lorenz_func = lorenz_ortega_2
+        bounds = ([0.0, 0.001], [5.0, 1.0])
+        initial_guess = [1.0, 0.5]
+    elif lorenz_type == 'gq_3':
+        lorenz_func = lorenz_gq_3
+        bounds = ([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0])
+        initial_guess = [0.0, 0.0, 0.0]
+    elif lorenz_type == 'beta_3':
+        lorenz_func = lorenz_beta_3
+        bounds = ([0.001, 0.001, 0.001], [0.999, 0.999, 0.999])
+        initial_guess = [0.5, 0.5, 0.5]
+    elif lorenz_type == 'sarabia_3':
+        lorenz_func = lorenz_sarabia_3
+        bounds = ([0.001, 0.001, 1.001], [5.0, 5.0, 5.0])
+        initial_guess = [1.0, 1.0, 1.5]
+    else:
+        raise ValueError(f"Unknown lorenz_type: {lorenz_type}. Must be one of: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3'")
+
+    # Define fractional error objective function
+    def objective(params):
+        total_squared_error = 0.0
+        for i in range(n_bins):
+            p_lower = i / n_bins
+            p_upper = (i + 1) / n_bins
+
+            L_lower = lorenz_func(p_lower, *params)
+            L_upper = lorenz_func(p_upper, *params)
+
+            predicted_share = L_upper - L_lower
+            actual_share = income_shares[i]
+
+            fractional_error = (predicted_share / actual_share) - 1.0
+            total_squared_error += fractional_error ** 2
+
+        return total_squared_error
+
+    # Optimize using L-BFGS-B with bounds
+    result = minimize(
+        objective,
+        initial_guess,
+        bounds=[(bounds[0][i], bounds[1][i]) for i in range(n_params)],
+        method='L-BFGS-B'
+    )
+    params = tuple(result.x)
+
+    # Calculate RMSE on fractional errors
+    rmse = np.sqrt(objective(params) / n_bins)
+
+    # Calculate Gini coefficient
+    gini = gini_from_params(lorenz_func, params)
+
+    return params, lorenz_func, gini, rmse
+
+
+def fit_lorenz_curve(p_data, L_data, lorenz_type):
     """
     Fit a Lorenz curve to data.
 
@@ -225,13 +317,8 @@ def fit_lorenz_curve(p_data, L_data, n_params=2, curve_type='quadratic', initial
         Cumulative proportion of population (sorted)
     L_data : array_like
         Cumulative proportion of income (corresponding to p_data)
-    n_params : int
-        Number of parameters (1, 2, or 3)
-    curve_type : str
-        For n_params=3, select 'quadratic' (implicit quadratic), 'beta' (Kakwani beta), or 'sarabia' (ordered family)
-        Ignored for n_params=1 or 2
-    initial_guess : tuple, optional
-        Initial guess for parameters
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
 
     Returns:
     --------
@@ -244,35 +331,32 @@ def fit_lorenz_curve(p_data, L_data, n_params=2, curve_type='quadratic', initial
     rmse : float
         Root mean squared error of fit
     """
-    # Select the appropriate Lorenz curve form
-    if n_params == 1:
+    # Extract n_params from lorenz_type
+    n_params = int(lorenz_type.split('_')[1])
+
+    # Select the appropriate Lorenz curve form based on lorenz_type
+    if lorenz_type == 'pareto_1':
         lorenz_func = lorenz_pareto_1
         bounds = ([-1], [1])
-        if initial_guess is None:
-            initial_guess = [0.0]
-    elif n_params == 2:
+        initial_guess = [0.0]
+    elif lorenz_type == 'ortega_2':
         lorenz_func = lorenz_ortega_2
         bounds = ([0.0, 0.001], [5.0, 1.0])
-        if initial_guess is None:
-            initial_guess = [1.0, 0.5]
-    elif n_params == 3:
-        if curve_type == 'beta':
-            lorenz_func = lorenz_beta_3
-            bounds = ([0.001, 0.001, 0.001], [0.999, 0.999, 0.999])
-            if initial_guess is None:
-                initial_guess = [0.5, 0.5, 0.5]
-        elif curve_type == 'sarabia':
-            lorenz_func = lorenz_sarabia_3
-            bounds = ([0.001, 0.001, 1.001], [5.0, 5.0, 5.0])
-            if initial_guess is None:
-                initial_guess = [1.0, 1.0, 1.5]
-        else:
-            lorenz_func = lorenz_gq_3
-            bounds = ([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0])
-            if initial_guess is None:
-                initial_guess = [0.0, 0.0, 0.0]
+        initial_guess = [1.0, 0.5]
+    elif lorenz_type == 'gq_3':
+        lorenz_func = lorenz_gq_3
+        bounds = ([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0])
+        initial_guess = [0.0, 0.0, 0.0]
+    elif lorenz_type == 'beta_3':
+        lorenz_func = lorenz_beta_3
+        bounds = ([0.001, 0.001, 0.001], [0.999, 0.999, 0.999])
+        initial_guess = [0.5, 0.5, 0.5]
+    elif lorenz_type == 'sarabia_3':
+        lorenz_func = lorenz_sarabia_3
+        bounds = ([0.001, 0.001, 1.001], [5.0, 5.0, 5.0])
+        initial_guess = [1.0, 1.0, 1.5]
     else:
-        raise ValueError("n_params must be 1, 2, or 3")
+        raise ValueError(f"Unknown lorenz_type: {lorenz_type}. Must be one of: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3'")
     
     # Remove boundary points if present (0, 0) and (1, 1)
     mask = (p_data > 0) & (p_data < 1)

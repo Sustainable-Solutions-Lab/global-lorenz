@@ -8,12 +8,13 @@ income distribution and fits a global Lorenz curve.
 import numpy as np
 import pandas as pd
 from .lorenz_curves import fit_lorenz_curve, lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
+from .country_fitting import evaluate_country_lorenz
 
 
-def aggregate_global_distribution(country_results, n_params,
-                                   curve_type='quadratic',
-                                   income_thresholds=None,
-                                   gdp_col='gdp', pop_col='population'):
+def aggregate_global_distribution(country_results,
+                                   lorenz_type,
+                                   income_thresholds,
+                                   gdp_col, pop_col):
     """
     Aggregate country-level distributions to create global distribution.
 
@@ -24,11 +25,9 @@ def aggregate_global_distribution(country_results, n_params,
     -----------
     country_results : pandas DataFrame
         Results from fit_country_lorenz_curves with parameters, GDP, and population
-    n_params : int
-        Number of parameters used in country fits
-    curve_type : str
-        For n_params=3: 'quadratic', 'beta', or 'sarabia'
-    income_thresholds : array_like, optional
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
+    income_thresholds : array_like
         Income levels to evaluate (in PPP dollars/year)
         If None, creates a range from min to max
     gdp_col : str
@@ -41,8 +40,6 @@ def aggregate_global_distribution(country_results, n_params,
     global_data : pandas DataFrame
         DataFrame with income thresholds and global cumulative distribution
     """
-    from .country_fitting import evaluate_country_lorenz
-    
     # Calculate mean income per capita for each country (GDP / population)
     country_results = country_results.copy()
     country_results['mean_income'] = country_results[gdp_col] / country_results[pop_col]
@@ -70,7 +67,7 @@ def aggregate_global_distribution(country_results, n_params,
         
         # Get population fractions below each threshold for this country
         try:
-            pop_fractions = evaluate_country_lorenz(row, n_params, threshold_fractions, curve_type)
+            pop_fractions = evaluate_country_lorenz(row, threshold_fractions, lorenz_type)
             
             # Convert to absolute numbers and add to global total
             country_pop = row[pop_col]
@@ -150,9 +147,7 @@ def global_distribution_to_lorenz(global_data):
     return p, L
 
 
-def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
-                     curve_type_country='quadratic', curve_type_global='quadratic',
-                     income_thresholds=None):
+def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     """
     Fit a global Lorenz curve from country-level data.
 
@@ -160,15 +155,9 @@ def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
     -----------
     country_results : pandas DataFrame
         Results from fit_country_lorenz_curves
-    n_params_country : int
-        Number of parameters used in country-level fits
-    n_params_global : int
-        Number of parameters for global Lorenz curve (1, 2, or 3)
-    curve_type_country : str
-        For n_params_country=3: 'quadratic', 'beta', or 'sarabia'
-    curve_type_global : str
-        For n_params_global=3: 'quadratic', 'beta', or 'sarabia'
-    income_thresholds : array_like, optional
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
+    income_thresholds : array_like
         Income levels to evaluate for aggregation
 
     Returns:
@@ -185,9 +174,10 @@ def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
     # Aggregate to global distribution
     global_data = aggregate_global_distribution(
         country_results,
-        n_params_country,
-        curve_type=curve_type_country,
-        income_thresholds=income_thresholds
+        lorenz_type,
+        income_thresholds,
+        'gdp',
+        'population',
     )
 
     # Convert to Lorenz curve format
@@ -195,58 +185,57 @@ def fit_global_lorenz(country_results, n_params_country, n_params_global=2,
 
     # Fit global Lorenz curve
     global_params, global_lorenz_func, global_gini, rmse = fit_lorenz_curve(
-        p, L, n_params=n_params_global, curve_type=curve_type_global
+        p, L, lorenz_type
     )
-    
-    print(f"Global Lorenz curve fitted with {n_params_global} parameters")
+
+    n_params = int(lorenz_type.split('_')[1])
+    print(f"Global Lorenz curve fitted with {n_params} parameters")
     print(f"Global Gini coefficient: {global_gini:.4f}")
     print(f"RMSE: {rmse:.6f}")
     
     return global_params, global_lorenz_func, global_gini, global_data
 
 
-def compute_global_poverty_metrics(country_results, n_params, poverty_lines):
+def compute_global_poverty_metrics(country_results, lorenz_type, poverty_lines):
     """
     Compute global poverty metrics at various poverty lines.
-    
+
     Parameters:
     -----------
     country_results : pandas DataFrame
         Results from fit_country_lorenz_curves
-    n_params : int
-        Number of parameters used in country fits
+    lorenz_type : str
+        Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
     poverty_lines : array_like
         Poverty line thresholds (in PPP dollars/year)
-    
+
     Returns:
     --------
     metrics : pandas DataFrame
         Poverty headcount and other metrics for each poverty line
     """
-    from .country_fitting import evaluate_country_lorenz
-    
     poverty_lines = np.asarray(poverty_lines)
     total_population = country_results['population'].sum()
-    
+
     results = []
-    
+
     for poverty_line in poverty_lines:
         people_below = 0
-        
+
         for idx, row in country_results.iterrows():
             country_mean = row['gdp'] / row['population']
             threshold_fraction = poverty_line / country_mean
-            
+
             try:
-                pop_fractions = evaluate_country_lorenz(row, n_params, [threshold_fraction])
+                pop_fractions = evaluate_country_lorenz(row, [threshold_fraction], lorenz_type)
                 people_below += pop_fractions[0] * row['population']
             except:
                 continue
-        
+
         results.append({
             'poverty_line': poverty_line,
             'people_below': people_below,
             'poverty_rate': people_below / total_population
         })
-    
+
     return pd.DataFrame(results)

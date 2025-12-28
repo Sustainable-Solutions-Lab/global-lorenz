@@ -16,6 +16,7 @@ from .lorenz_curves import (
     lorenz_beta_3,
     lorenz_sarabia_3,
     fit_lorenz_curve,
+    fit_lorenz_curve_decile,
 )
 from .country_fitting import fit_country_lorenz_curves
 from .global_aggregation import aggregate_global_distribution, fit_global_lorenz
@@ -27,6 +28,7 @@ __all__ = [
     "lorenz_beta_3",
     "lorenz_sarabia_3",
     "fit_lorenz_curve",
+    "fit_lorenz_curve_decile",
     "fit_country_lorenz_curves",
     "aggregate_global_distribution",
     "fit_global_lorenz",
