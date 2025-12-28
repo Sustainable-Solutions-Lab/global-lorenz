@@ -1,0 +1,197 @@
+"""
+Country-level Lorenz curve fitting.
+
+This module handles reading country-level income distribution data and
+fitting Lorenz curves to each country.
+"""
+
+import numpy as np
+import pandas as pd
+from .lorenz_curves import fit_lorenz_curve
+
+
+def read_country_data(filepath):
+    """
+    Read country-level income data from Excel file.
+    
+    Expected format:
+    - Country name column
+    - Income decile/percentile columns (e.g., D1, D2, ..., D10)
+    - GDP (PPP) column
+    - Population column
+    
+    Parameters:
+    -----------
+    filepath : str
+        Path to Excel file
+    
+    Returns:
+    --------
+    data : pandas DataFrame
+        Country-level data with income distribution, GDP, and population
+    """
+    df = pd.read_excel(filepath)
+    return df
+
+
+def prepare_lorenz_data(income_shares):
+    """
+    Convert income shares to Lorenz curve data points.
+    
+    Parameters:
+    -----------
+    income_shares : array_like
+        Income shares for each group (e.g., deciles)
+        Should sum to approximately 1.0
+    
+    Returns:
+    --------
+    p : array
+        Cumulative population proportions [0, 0.1, 0.2, ..., 1.0]
+    L : array
+        Cumulative income proportions [0, L1, L2, ..., 1.0]
+    """
+    income_shares = np.asarray(income_shares)
+    
+    # Normalize to ensure sum = 1
+    income_shares = income_shares / np.sum(income_shares)
+    
+    # Number of groups
+    n_groups = len(income_shares)
+    
+    # Population proportions (assuming equal groups)
+    p = np.linspace(0, 1, n_groups + 1)
+    
+    # Cumulative income proportions
+    L = np.concatenate([[0], np.cumsum(income_shares)])
+    
+    return p, L
+
+
+def fit_country_lorenz_curves(data_df, income_cols, n_params=2):
+    """
+    Fit Lorenz curves to all countries in the dataset.
+    
+    Parameters:
+    -----------
+    data_df : pandas DataFrame
+        Country-level data
+    income_cols : list
+        Column names containing income distribution data (in order)
+    n_params : int
+        Number of parameters for Lorenz curve (1, 2, or 3)
+    
+    Returns:
+    --------
+    results : pandas DataFrame
+        DataFrame with fitted parameters, Gini coefficients, and fit quality
+    """
+    results = []
+    
+    for idx, row in data_df.iterrows():
+        country_name = row.get('Country', row.get('country', f'Country_{idx}'))
+        
+        # Extract income shares
+        income_shares = row[income_cols].values
+        
+        # Skip if data is missing
+        if np.any(pd.isna(income_shares)):
+            print(f"Skipping {country_name}: missing income data")
+            continue
+        
+        # Convert to Lorenz curve data
+        p, L = prepare_lorenz_data(income_shares)
+        
+        try:
+            # Fit Lorenz curve
+            params, lorenz_func, gini, rmse = fit_lorenz_curve(p, L, n_params=n_params)
+            
+            result = {
+                'country': country_name,
+                'gini': gini,
+                'rmse': rmse,
+            }
+            
+            # Add parameters
+            for i, param in enumerate(params):
+                result[f'param_{i+1}'] = param
+            
+            # Add other data if available
+            if 'GDP' in row.index or 'gdp' in row.index:
+                result['gdp'] = row.get('GDP', row.get('gdp'))
+            if 'Population' in row.index or 'population' in row.index:
+                result['population'] = row.get('Population', row.get('population'))
+            
+            results.append(result)
+            
+        except Exception as e:
+            print(f"Error fitting {country_name}: {e}")
+            continue
+    
+    results_df = pd.DataFrame(results)
+    return results_df
+
+
+def evaluate_country_lorenz(row, n_params, income_thresholds):
+    """
+    Evaluate a fitted country Lorenz curve at specific income thresholds.
+    
+    Parameters:
+    -----------
+    row : pandas Series
+        Row from fitted results containing parameters
+    n_params : int
+        Number of parameters
+    income_thresholds : array_like
+        Income levels at which to evaluate (in units of mean income)
+    
+    Returns:
+    --------
+    populations_below : array
+        Population fraction below each threshold
+    """
+    from .lorenz_curves import lorenz_1param, lorenz_2param, lorenz_3param
+    
+    # Extract parameters
+    params = tuple(row[f'param_{i+1}'] for i in range(n_params))
+    
+    # Select appropriate function
+    if n_params == 1:
+        lorenz_func = lorenz_1param
+    elif n_params == 2:
+        lorenz_func = lorenz_2param
+    else:
+        lorenz_func = lorenz_3param
+    
+    # For each income threshold (as fraction of mean), find the population quantile
+    # This requires inverting the derivative of the Lorenz curve
+    # dL/dp = income at quantile p / mean income
+    
+    populations_below = []
+    
+    for threshold in income_thresholds:
+        # Search for p where dL/dp = threshold
+        # Use numerical search
+        p_values = np.linspace(0.001, 0.999, 1000)
+        dp = 0.001
+        
+        # Compute derivative numerically
+        derivatives = np.zeros(len(p_values))
+        for i, p in enumerate(p_values):
+            dL = lorenz_func(p + dp/2, *params) - lorenz_func(p - dp/2, *params)
+            derivatives[i] = dL / dp
+        
+        # Find where derivative crosses threshold
+        if threshold < derivatives[0]:
+            # Everyone below threshold
+            pop_below = 0.0
+        elif threshold > derivatives[-1]:
+            # Everyone above threshold
+            pop_below = 1.0
+        else:
+            # Interpolate
+            pop_below = np.interp(threshold, derivatives, p_values)
+        
+        populations_below.append(pop_below)
+    
+    return np.array(populations_below)
