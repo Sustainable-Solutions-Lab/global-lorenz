@@ -24,6 +24,8 @@ from global_lorenz import (
     lorenz_pareto_1,
     lorenz_ortega_2,
     lorenz_gq_3,
+    lorenz_beta_3,
+    lorenz_sarabia_3,
 )
 from global_lorenz.country_fitting import read_country_data, filter_most_recent_complete, prepare_lorenz_data
 from global_lorenz.global_aggregation import global_distribution_to_lorenz
