@@ -128,10 +128,17 @@ class TestFitting:
         # Create synthetic decile data
         income_shares = np.array([0.02, 0.03, 0.04, 0.05, 0.07, 0.09, 0.12, 0.15, 0.18, 0.25])
 
-        params, lorenz_func, gini, rmse = fit_lorenz_curve_decile(income_shares, 'ortega_2')
+        params, lorenz_func, gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(income_shares, 'ortega_2')
 
         # Check that parameters were fitted
         assert len(params) == 2
+
+        # Check that goodness-of-fit statistics are reasonable
+        assert rmse >= 0
+        assert mafe >= 0
+        assert max_abs_error >= 0
+        assert mafe <= rmse  # MAFE should be <= RMSE due to Jensen's inequality
+        assert max_abs_error >= mafe  # Max error should be >= mean absolute error
 
         # Verify the fit is reasonable by checking predicted shares match actual shares
         total_error = 0.0
@@ -148,6 +155,7 @@ class TestFitting:
         # Average fractional error should be small
         avg_fractional_error = total_error / 10
         assert avg_fractional_error < 0.1  # Less than 10% average error
+        assert abs(avg_fractional_error - mafe) < 1e-10  # Should match computed mafe
 
 
 class TestCountryFitting:
