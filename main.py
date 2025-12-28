@@ -22,7 +22,7 @@ from global_lorenz import (
     lorenz_2param,
     lorenz_3param,
 )
-from global_lorenz.country_fitting import read_country_data
+from global_lorenz.country_fitting import read_country_data, filter_most_recent_complete
 
 
 def plot_lorenz_curves(country_results, n_params, output_dir='output'):
@@ -145,8 +145,12 @@ def run_workflow(input_file, income_cols,
     
     # Step 1: Load data
     print("\n1. Loading country data...")
-    data_df = read_country_data(input_file)
-    print(f"   Loaded data for {len(data_df)} countries")
+    raw_data = read_country_data(input_file)
+    print(f"   Loaded {len(raw_data)} total rows")
+
+    # Filter to most recent complete data per country
+    data_df = filter_most_recent_complete(raw_data, income_cols)
+    print(f"   Filtered to {len(data_df)} countries with most recent complete data")
     
     # Step 2: Fit country-level Lorenz curves
     print(f"\n2. Fitting {n_params_country}-parameter Lorenz curves at country level...")
@@ -211,23 +215,17 @@ def run_workflow(input_file, income_cols,
 
 if __name__ == '__main__':
     import sys
-    
+
     if len(sys.argv) < 2:
-        print("Usage: python main.py <input_excel_file> [income_column_prefix]")
-        print("\nExample: python main.py data.xlsx D")
-        print("  (assumes columns named D1, D2, ..., D10 for deciles)")
+        print("Usage: python main.py <input_file>")
+        print("\nExample: python main.py data/input/pip_2025-12-28.xlsx")
+        print("  (assumes columns named decile1, decile2, ..., decile10)")
         sys.exit(1)
-    
+
     input_file = sys.argv[1]
-    
-    # Default to decile columns D1-D10
-    if len(sys.argv) > 2:
-        prefix = sys.argv[2]
-    else:
-        prefix = 'D'
-    
-    # Generate income column names
-    income_cols = [f'{prefix}{i}' for i in range(1, 11)]
+
+    # Use actual column names from World Bank PIP data
+    income_cols = [f'decile{i}' for i in range(1, 11)]
     
     # Run workflow with different parameter configurations
     print("\n" + "=" * 70)

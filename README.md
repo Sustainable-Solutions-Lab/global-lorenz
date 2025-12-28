@@ -27,36 +27,63 @@ pip install -e .
 ### Quick Start
 
 ```bash
-python main.py your_data.xlsx
+python main.py data/input/pip_2025-12-28.xlsx
 ```
 
-This assumes your Excel file has:
-- A column named `Country` with country names
-- Columns `D1`, `D2`, ..., `D10` with income shares for deciles
-- A column named `GDP` with PPP GDP
-- A column named `Population` with population counts
-
-### Custom Column Names
-
-If your data uses different column names:
+Or with the CSV version:
 
 ```bash
-python main.py your_data.xlsx P  # for P1, P2, ..., P10
+python main.py data/input/pip.csv
 ```
+
+The script automatically:
+- Reads data from World Bank PIP format (Excel or CSV)
+- Filters to the most recent year for each country with complete data
+- Fits Lorenz curves at country and global levels
 
 ### Expected Data Format
 
-The input Excel file should have the following structure:
+The input file should be in World Bank Poverty and Inequality Platform (PIP) format with the following columns:
 
-| Country | D1 | D2 | ... | D10 | GDP | Population |
-|---------|----|----|-----|-----|-----|------------|
-| Country1| 0.02 | 0.05 | ... | 0.25 | 1e12 | 1e8 |
-| Country2| 0.03 | 0.06 | ... | 0.20 | 5e11 | 5e7 |
+#### Distributional shares (deciles)
 
-Where:
-- **D1-D10**: Income shares for each decile (should sum to 1.0)
-- **GDP**: PPP-adjusted GDP in current dollars
-- **Population**: Total population
+**decile1 ... decile10**
+
+Share of total welfare accruing to each decile:
+- `decile1` = poorest 10%
+- `decile2` = second poorest 10%
+- ...
+- `decile10` = richest 10%
+
+These values sum to 1.0 for each country-year observation.
+
+#### Population & macro aggregates
+
+**reporting_pop**
+
+Population used to weight this country-year observation.
+
+**reporting_gdp**
+
+GDP associated with the reporting year (PPP-consistent).
+
+**reporting_pce**
+
+Private consumption expenditure (PPP-consistent).
+
+#### Other required columns
+
+**country_name**
+
+Name of the country.
+
+**reporting_year**
+
+Year of the data observation.
+
+### Data Filtering
+
+When the input data contains multiple years for each country, the script automatically selects the most recent year that has complete data (all decile columns, `reporting_pop`, and `reporting_gdp` are non-null)
 
 ### Programmatic Usage
 
@@ -65,18 +92,24 @@ from global_lorenz import (
     fit_country_lorenz_curves,
     fit_global_lorenz,
 )
-from global_lorenz.country_fitting import read_country_data
+from global_lorenz.country_fitting import (
+    read_country_data,
+    filter_most_recent_complete,
+)
 
 # Load data
-data_df = read_country_data('your_data.xlsx')
+raw_data = read_country_data('data/input/pip_2025-12-28.xlsx')
 
 # Define income columns
-income_cols = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10']
+income_cols = [f'decile{i}' for i in range(1, 11)]
+
+# Filter to most recent complete data per country
+data_df = filter_most_recent_complete(raw_data, income_cols)
 
 # Fit country-level Lorenz curves (2-parameter form)
 country_results = fit_country_lorenz_curves(
-    data_df, 
-    income_cols, 
+    data_df,
+    income_cols,
     n_params=2
 )
 
