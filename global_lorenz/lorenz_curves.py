@@ -4,12 +4,11 @@ Lorenz curve functional forms and fitting routines.
 This module provides three different functional forms for Lorenz curves:
 1. 1-parameter form: General Quadratic (Ryu-Slottje)
 2. 2-parameter form: Pareto-based
-3. 3-parameter form: Generalized Beta of the Second Kind (GB2)
+3. 3-parameter form: Generalized power form
 """
 
 import numpy as np
 from scipy.optimize import minimize, curve_fit
-from scipy.special import beta as beta_func
 
 
 def lorenz_1param(p, a):
