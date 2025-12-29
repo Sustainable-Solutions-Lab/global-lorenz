@@ -217,7 +217,7 @@ def gini_from_params(lorenz_func, params):
     return gini
 
 
-def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, error_type='intermediate'):
+def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, error_type='hybrid'):
     """
     Fit a Lorenz curve to income share data using weighted error objective.
 
@@ -226,6 +226,9 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     - 'fractional': weight = pop[i], error = (pred/actual - 1)
     - 'absolute':   weight = pop[i], error = (pred - actual)
     - 'intermediate': weight = pop[i] * income[i], error = (pred - actual)
+    - 'hybrid': weight = pop[i], error = (pred - actual) / sqrt(actual)
+                This minimizes the product of absolute and relative errors,
+                giving balanced importance across bins regardless of size.
 
     This objective function can handle both equal-population bins (country-level deciles)
     and unequal-population bins (global aggregated data).
@@ -243,7 +246,8 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
         Type of error objective:
         - 'fractional': fractional error weighted by population
         - 'absolute': absolute error weighted by population
-        - 'intermediate': absolute error weighted by population * income [default]
+        - 'intermediate': absolute error weighted by population * income
+        - 'hybrid': product of absolute & relative error = (pred-actual)²/actual [default]
 
     Returns:
     --------
@@ -302,7 +306,34 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     p_cumulative = np.concatenate([[0], np.cumsum(population_shares)])
 
     # Define weighted error objective function
-    if error_type == 'absolute':
+    if error_type == 'hybrid':
+        # HYBRID: Minimizes product of absolute and relative errors
+        # error² = (pred - actual)² / actual
+        # This gives balanced importance: small bins get upweighted, large bins downweighted
+        def objective(params):
+            total_squared_error = 0.0
+            for i in range(n_bins):
+                p_lower = p_cumulative[i]
+                p_upper = p_cumulative[i + 1]
+
+                L_lower = lorenz_func(p_lower, *params)
+                L_upper = lorenz_func(p_upper, *params)
+
+                predicted_share = L_upper - L_lower
+                actual_share = income_shares[i]
+
+                # Skip bins with negligible income share
+                if actual_share < EPSILON:
+                    continue
+
+                # Hybrid error: (pred - actual)² / actual
+                absolute_error = predicted_share - actual_share
+                weight = population_shares[i]
+                total_squared_error += weight * (absolute_error ** 2) / actual_share
+
+            return total_squared_error
+
+    elif error_type == 'absolute':
         # ABSOLUTE ERROR: weight = pop[i], error = (predicted - actual)
         def objective(params):
             total_squared_error = 0.0
@@ -377,7 +408,50 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     params = tuple(result.x)
 
     # Calculate weighted goodness-of-fit statistics
-    if error_type == 'fractional':
+    if error_type == 'hybrid':
+        # HYBRID ERROR statistics: (pred - actual)² / actual
+        errors = []
+        weights = []
+        valid_indices = []
+        for i in range(n_bins):
+            p_lower = p_cumulative[i]
+            p_upper = p_cumulative[i + 1]
+            L_lower = lorenz_func(p_lower, *params)
+            L_upper = lorenz_func(p_upper, *params)
+            predicted_share = L_upper - L_lower
+            actual_share = income_shares[i]
+
+            # Skip bins with negligible income share
+            if actual_share < EPSILON:
+                continue
+
+            # Hybrid error: sqrt((pred - actual)² / actual) = |pred - actual| / sqrt(actual)
+            absolute_error = predicted_share - actual_share
+            hybrid_error = absolute_error / np.sqrt(actual_share)
+            errors.append(hybrid_error)
+            weights.append(population_shares[i])
+            valid_indices.append(i)
+
+        errors = np.array(errors)
+        weights = np.array(weights)
+        weights = weights / np.sum(weights)  # Normalize
+
+        rmse = np.sqrt(np.sum(weights * errors ** 2))
+        mafe = np.sum(weights * np.abs(errors))
+
+        # For max error, report actual absolute error (not hybrid) for interpretability
+        max_abs_error = 0.0
+        for i in valid_indices:
+            p_lower = p_cumulative[i]
+            p_upper = p_cumulative[i + 1]
+            L_lower = lorenz_func(p_lower, *params)
+            L_upper = lorenz_func(p_upper, *params)
+            predicted_share = L_upper - L_lower
+            actual_share = income_shares[i]
+            abs_err = abs(predicted_share - actual_share)
+            max_abs_error = max(max_abs_error, abs_err)
+
+    elif error_type == 'fractional':
         # FRACTIONAL ERROR statistics
         fractional_errors = []
         valid_pop_shares = []
