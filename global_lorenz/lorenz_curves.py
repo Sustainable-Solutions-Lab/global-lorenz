@@ -217,11 +217,13 @@ def gini_from_params(lorenz_func, params):
     return gini
 
 
-def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None):
+def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, use_absolute_error=False):
     """
-    Fit a Lorenz curve to income share data using population-weighted squared fractional error objective.
+    Fit a Lorenz curve to income share data using population-weighted error objective.
 
-    Minimizes sum over bins of: pop_weight[i] * ((predicted_share / actual_share) - 1)^2
+    Minimizes sum over bins of: pop_weight[i] * error^2
+    where error = (predicted_share / actual_share) - 1  [fractional]
+       or error = predicted_share - actual_share         [absolute]
 
     This objective function can handle both equal-population bins (country-level deciles)
     and unequal-population bins (global aggregated data).
@@ -235,6 +237,9 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None):
     population_shares : array_like, optional
         Population share for each bin (should sum to approximately 1)
         If None, assumes equal population bins (1/n_bins for each)
+    use_absolute_error : bool, optional
+        If True, use absolute error (predicted - actual)
+        If False, use fractional error ((predicted/actual) - 1)  [default]
 
     Returns:
     --------
@@ -245,11 +250,11 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None):
     gini : float
         Gini coefficient from fitted curve
     rmse : float
-        Root mean squared fractional error (population-weighted)
+        Root mean squared error (population-weighted, fractional or absolute)
     mafe : float
-        Mean absolute fractional error (population-weighted)
+        Mean absolute error (population-weighted, fractional or absolute)
     max_abs_error : float
-        Maximum absolute fractional error across all bins
+        Maximum absolute error across all bins
     """
     income_shares = np.asarray(income_shares)
     income_shares = income_shares / np.sum(income_shares)
@@ -292,27 +297,48 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None):
     # Compute cumulative population shares for bin boundaries
     p_cumulative = np.concatenate([[0], np.cumsum(population_shares)])
 
-    # Define population-weighted fractional error objective function
-    def objective(params):
-        total_squared_error = 0.0
-        for i in range(n_bins):
-            p_lower = p_cumulative[i]
-            p_upper = p_cumulative[i + 1]
+    # Define population-weighted error objective function
+    if use_absolute_error:
+        # ABSOLUTE ERROR: minimize sum of pop_weight[i] * (predicted - actual)^2
+        def objective(params):
+            total_squared_error = 0.0
+            for i in range(n_bins):
+                p_lower = p_cumulative[i]
+                p_upper = p_cumulative[i + 1]
 
-            L_lower = lorenz_func(p_lower, *params)
-            L_upper = lorenz_func(p_upper, *params)
+                L_lower = lorenz_func(p_lower, *params)
+                L_upper = lorenz_func(p_upper, *params)
 
-            predicted_share = L_upper - L_lower
-            actual_share = income_shares[i]
+                predicted_share = L_upper - L_lower
+                actual_share = income_shares[i]
 
-            # Skip bins with negligible income share to avoid division by zero
-            if actual_share < EPSILON:
-                continue
+                absolute_error = predicted_share - actual_share
+                total_squared_error += population_shares[i] * absolute_error ** 2
 
-            fractional_error = (predicted_share / actual_share) - 1.0
-            total_squared_error += population_shares[i] * fractional_error ** 2
+            return total_squared_error
+    else:
+        # FRACTIONAL ERROR: minimize sum of pop_weight[i] * ((predicted/actual) - 1)^2
+        # Commented out to easily switch back if needed
+        def objective(params):
+            total_squared_error = 0.0
+            for i in range(n_bins):
+                p_lower = p_cumulative[i]
+                p_upper = p_cumulative[i + 1]
 
-        return total_squared_error
+                L_lower = lorenz_func(p_lower, *params)
+                L_upper = lorenz_func(p_upper, *params)
+
+                predicted_share = L_upper - L_lower
+                actual_share = income_shares[i]
+
+                # Skip bins with negligible income share to avoid division by zero
+                if actual_share < EPSILON:
+                    continue
+
+                fractional_error = (predicted_share / actual_share) - 1.0
+                total_squared_error += population_shares[i] * fractional_error ** 2
+
+            return total_squared_error
 
     # Optimize using L-BFGS-B with bounds
     result = minimize(
@@ -324,37 +350,57 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None):
     params = tuple(result.x)
 
     # Calculate population-weighted goodness-of-fit statistics
-    fractional_errors = []
-    valid_pop_shares = []
-    for i in range(n_bins):
-        p_lower = p_cumulative[i]
-        p_upper = p_cumulative[i + 1]
-        L_lower = lorenz_func(p_lower, *params)
-        L_upper = lorenz_func(p_upper, *params)
-        predicted_share = L_upper - L_lower
-        actual_share = income_shares[i]
+    if use_absolute_error:
+        # ABSOLUTE ERROR statistics
+        errors = []
+        for i in range(n_bins):
+            p_lower = p_cumulative[i]
+            p_upper = p_cumulative[i + 1]
+            L_lower = lorenz_func(p_lower, *params)
+            L_upper = lorenz_func(p_upper, *params)
+            predicted_share = L_upper - L_lower
+            actual_share = income_shares[i]
 
-        # Skip bins with negligible income share to avoid division by zero
-        if actual_share < EPSILON:
-            continue
+            absolute_error = predicted_share - actual_share
+            errors.append(absolute_error)
 
-        fractional_error = (predicted_share / actual_share) - 1.0
-        fractional_errors.append(fractional_error)
-        valid_pop_shares.append(population_shares[i])
-
-    fractional_errors = np.array(fractional_errors)
-    valid_pop_shares = np.array(valid_pop_shares)
-
-    # Renormalize population shares for valid bins only
-    if len(valid_pop_shares) > 0:
-        valid_pop_shares = valid_pop_shares / np.sum(valid_pop_shares)
-        rmse = np.sqrt(np.sum(valid_pop_shares * fractional_errors ** 2))
-        mafe = np.sum(valid_pop_shares * np.abs(fractional_errors))
-        max_abs_error = np.max(np.abs(fractional_errors))
+        errors = np.array(errors)
+        rmse = np.sqrt(np.sum(population_shares * errors ** 2))
+        mafe = np.sum(population_shares * np.abs(errors))
+        max_abs_error = np.max(np.abs(errors))
     else:
-        rmse = 0.0
-        mafe = 0.0
-        max_abs_error = 0.0
+        # FRACTIONAL ERROR statistics
+        fractional_errors = []
+        valid_pop_shares = []
+        for i in range(n_bins):
+            p_lower = p_cumulative[i]
+            p_upper = p_cumulative[i + 1]
+            L_lower = lorenz_func(p_lower, *params)
+            L_upper = lorenz_func(p_upper, *params)
+            predicted_share = L_upper - L_lower
+            actual_share = income_shares[i]
+
+            # Skip bins with negligible income share to avoid division by zero
+            if actual_share < EPSILON:
+                continue
+
+            fractional_error = (predicted_share / actual_share) - 1.0
+            fractional_errors.append(fractional_error)
+            valid_pop_shares.append(population_shares[i])
+
+        fractional_errors = np.array(fractional_errors)
+        valid_pop_shares = np.array(valid_pop_shares)
+
+        # Renormalize population shares for valid bins only
+        if len(valid_pop_shares) > 0:
+            valid_pop_shares = valid_pop_shares / np.sum(valid_pop_shares)
+            rmse = np.sqrt(np.sum(valid_pop_shares * fractional_errors ** 2))
+            mafe = np.sum(valid_pop_shares * np.abs(fractional_errors))
+            max_abs_error = np.max(np.abs(fractional_errors))
+        else:
+            rmse = 0.0
+            mafe = 0.0
+            max_abs_error = 0.0
 
     # Calculate Gini coefficient
     gini = gini_from_params(lorenz_func, params)

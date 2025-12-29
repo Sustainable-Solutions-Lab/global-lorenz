@@ -51,7 +51,7 @@ def aggregate_global_distribution(country_results,
         income_thresholds = np.logspace(
             np.log10(min_income),
             np.log10(max_income),
-            1000
+            100  # Using 100 bins for faster testing (was 1000)
         )
     
     income_thresholds = np.asarray(income_thresholds)
@@ -221,18 +221,23 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
         'population',
     )
 
-    # Convert to Lorenz curve format (high-resolution: ~1000 bins)
+    # Convert to Lorenz curve format (high-resolution: ~100 bins)
     p, L = global_distribution_to_lorenz(global_data)
 
     # Resample to equal-population bins (10 bins = deciles, consistent with country-level)
-    # This avoids tiny bins at extremes that would dominate fractional error
+    # This avoids tiny bins at extremes that would dominate errors
     income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=10)
 
-    # Fit global Lorenz curve using population-weighted fractional error
+    # Fit global Lorenz curve using population-weighted ABSOLUTE error
+    # NOTE: To switch back to FRACTIONAL error, change use_absolute_error=False
     from .lorenz_curves import fit_lorenz_curve_decile
     global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
-        income_shares, lorenz_type, population_shares
+        income_shares, lorenz_type, population_shares, use_absolute_error=True
     )
+    # # FRACTIONAL ERROR version (commented out):
+    # global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
+    #     income_shares, lorenz_type, population_shares, use_absolute_error=False
+    # )
 
     n_params = int(lorenz_type.split('_')[1])
     print(f"Global Lorenz curve fitted with {n_params} parameters")
