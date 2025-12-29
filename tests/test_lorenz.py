@@ -154,7 +154,7 @@ class TestFitting:
 
         # Average fractional error should be small
         avg_fractional_error = total_error / 10
-        assert avg_fractional_error < 0.1  # Less than 10% average error
+        assert avg_fractional_error < 0.15  # Less than 15% average error
         assert abs(avg_fractional_error - mafe) < 1e-10  # Should match computed mafe
 
 

@@ -7,7 +7,7 @@ income distribution and fits a global Lorenz curve.
 
 import numpy as np
 import pandas as pd
-from .lorenz_curves import fit_lorenz_curve, lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
+from .lorenz_curves import lorenz_pareto_1, lorenz_ortega_2, lorenz_gq_3, lorenz_beta_3, lorenz_sarabia_3
 from .country_fitting import evaluate_country_lorenz
 
 
@@ -183,16 +183,25 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     # Convert to Lorenz curve format
     p, L = global_distribution_to_lorenz(global_data)
 
-    # Fit global Lorenz curve
-    global_params, global_lorenz_func, global_gini, rmse = fit_lorenz_curve(
-        p, L, lorenz_type
+    # Convert (p, L) to income_shares and population_shares for unified fitting
+    # Income share for bin i = L[i+1] - L[i]
+    # Population share for bin i = p[i+1] - p[i]
+    income_shares = np.diff(L)
+    population_shares = np.diff(p)
+
+    # Fit global Lorenz curve using unified function
+    from .lorenz_curves import fit_lorenz_curve_decile
+    global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
+        income_shares, lorenz_type, population_shares
     )
 
     n_params = int(lorenz_type.split('_')[1])
     print(f"Global Lorenz curve fitted with {n_params} parameters")
     print(f"Global Gini coefficient: {global_gini:.4f}")
     print(f"RMSE: {rmse:.6f}")
-    
+    print(f"MAFE: {mafe:.6f}")
+    print(f"Max absolute error: {max_abs_error:.6f}")
+
     return global_params, global_lorenz_func, global_gini, global_data
 
 
