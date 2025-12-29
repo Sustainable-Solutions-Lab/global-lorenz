@@ -166,7 +166,7 @@ def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     print(f"Saved global Lorenz curve (log scale) to {output_dir / filename_log}")
 
 
-def run_workflow(input_file, income_cols, lorenz_type):
+def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid', global_fit_on_cumulative=False):
     """
     Run the complete workflow.
 
@@ -184,10 +184,17 @@ def run_workflow(input_file, income_cols, lorenz_type):
         - 'gq_3': 3-parameter generalized quadratic
         - 'beta_3': 3-parameter Kakwani beta
         - 'sarabia_3': 3-parameter Sarabia ordered family
+    global_error_type : str, optional
+        Error metric for global Lorenz curve fitting [default: 'hybrid'].
+        Options: 'hybrid', 'absolute', 'fractional'
+    global_fit_on_cumulative : bool, optional
+        If True, fit global curve on cumulative L(p) values directly.
+        If False (default), fit on income shares.
     """
     # Create timestamped output directory
+    fit_method = 'cumulative' if global_fit_on_cumulative else 'shares'
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_dir = Path('data/output') / f"{lorenz_type}_{timestamp}"
+    output_dir = Path('data/output') / f"{lorenz_type}_{global_error_type}_{fit_method}_{timestamp}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
@@ -228,16 +235,23 @@ def run_workflow(input_file, income_cols, lorenz_type):
      global_rmse, global_mafe, global_max_abs_error,
      global_fractional_rmse, global_fractional_mafe, global_fractional_max_abs_error,
      global_absolute_rmse, global_absolute_mafe, global_absolute_max_abs_error,
-     global_data) = fit_global_lorenz(
+     global_data, fitted_bins_data) = fit_global_lorenz(
         country_results,
         lorenz_type,
         None,
+        error_type=global_error_type,
+        fit_on_cumulative=global_fit_on_cumulative,
     )
 
     # Save global data
     filename = f'global_distribution_{lorenz_type}.csv'
     global_data.to_csv(output_dir / filename, index=False)
     print(f"   Saved global distribution to {output_dir / filename}")
+
+    # Save fitted bins data
+    filename_bins = f'global_distribution_fitted_bins_{lorenz_type}.csv'
+    fitted_bins_data.to_csv(output_dir / filename_bins, index=False)
+    print(f"   Saved fitted bins data to {output_dir / filename_bins}")
 
     # Step 5: Plot global Lorenz curve
     print("\n5. Plotting global Lorenz curve...")
@@ -252,6 +266,19 @@ def run_workflow(input_file, income_cols, lorenz_type):
     report.append("=" * 70)
     report.append(f"\nLorenz curve type: {lorenz_type}")
     report.append(f"Number of countries: {len(country_results)}")
+    report.append(f"\nFitting configuration:")
+    report.append(f"  Country-level:")
+    report.append(f"    Number of bins: 10 (deciles)")
+    report.append(f"    Fitting target: income shares")
+    report.append(f"    Error metric: hybrid (minimizes product of absolute and relative errors)")
+    report.append(f"  Global-level:")
+    report.append(f"    High-resolution aggregation bins: 1000")
+    report.append(f"    Equal-population bins for fitting: 100 (percentiles)")
+    report.append(f"    Fitting target: {'cumulative L(p) values' if global_fit_on_cumulative else 'income shares'}")
+    report.append(f"    Error metric: {global_error_type}")
+    report.append(f"\nNote: Error statistics are computed on the fitting target.")
+    if not global_fit_on_cumulative:
+        report.append(f"When fitting on shares, cumulative L(p) errors may be larger due to error accumulation.")
     report.append(f"\nCountry-level Gini statistics:")
     report.append(f"  Mean: {country_results['gini'].mean():.4f}")
     report.append(f"  Median: {country_results['gini'].median():.4f}")
@@ -304,33 +331,57 @@ def run_workflow(input_file, income_cols, lorenz_type):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python main.py <input_file> [lorenz_types]")
+        print("Usage: python main.py <input_file> [lorenz_types] [--error-type=TYPE] [--cumulative]")
         print("\nArguments:")
-        print("  input_file    : Path to Excel/CSV file with income distribution data")
-        print("  lorenz_types  : Optional comma-separated list of Lorenz curve types")
-        print("                  Options: pareto_1, ortega_2, gq_3, beta_3, sarabia_3")
-        print("                  Default: all five types")
+        print("  input_file       : Path to Excel/CSV file with income distribution data")
+        print("  lorenz_types     : Optional comma-separated list of Lorenz curve types")
+        print("                     Options: pareto_1, ortega_2, gq_3, beta_3, sarabia_3")
+        print("                     Default: all five types")
+        print("  --error-type=TYPE: Error metric for global fitting (hybrid, absolute, fractional)")
+        print("                     Default: hybrid")
+        print("  --cumulative     : Fit global curve on L(p) values instead of income shares")
+        print("                     Default: fit on shares")
         print("\nExamples:")
         print("  python main.py data/input/pip_2025-12-28.xlsx")
         print("  python main.py data/input/pip_2025-12-28.xlsx beta_3")
         print("  python main.py data/input/pip_2025-12-28.xlsx ortega_2,beta_3")
+        print("  python main.py data/input/pip_2025-12-28.xlsx ortega_2 --error-type=absolute")
+        print("  python main.py data/input/pip_2025-12-28.xlsx beta_3 --cumulative")
+        print("  python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --cumulative")
         sys.exit(1)
 
     input_file = sys.argv[1]
 
-    # Parse lorenz_types argument
-    if len(sys.argv) >= 3:
-        lorenz_types = sys.argv[2].split(',')
-    else:
+    # Parse optional arguments
+    lorenz_types = None
+    global_error_type = 'hybrid'
+    global_fit_on_cumulative = False
+
+    for arg in sys.argv[2:]:
+        if arg.startswith('--error-type='):
+            global_error_type = arg.split('=')[1]
+        elif arg == '--cumulative':
+            global_fit_on_cumulative = True
+        elif not arg.startswith('--'):
+            # Must be lorenz_types
+            lorenz_types = arg.split(',')
+
+    if lorenz_types is None:
         lorenz_types = ['pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3']
 
-    # Validate lorenz_types
+    # Validate arguments
     valid_types = ['pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3']
     for lt in lorenz_types:
         if lt not in valid_types:
             print(f"Error: Invalid lorenz_type '{lt}'")
             print(f"Valid options: {', '.join(valid_types)}")
             sys.exit(1)
+
+    valid_error_types = ['hybrid', 'absolute', 'fractional']
+    if global_error_type not in valid_error_types:
+        print(f"Error: Invalid error_type '{global_error_type}'")
+        print(f"Valid options: {', '.join(valid_error_types)}")
+        sys.exit(1)
 
     # Use actual column names from World Bank PIP data
     income_cols = [f'decile{i}' for i in range(1, 11)]
@@ -349,6 +400,8 @@ if __name__ == '__main__':
                 input_file,
                 income_cols,
                 lorenz_type,
+                global_error_type=global_error_type,
+                global_fit_on_cumulative=global_fit_on_cumulative,
             )
         except Exception as e:
             print(f"Error with configuration {lorenz_type}: {e}")

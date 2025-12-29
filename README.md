@@ -43,9 +43,80 @@ This will automatically:
 - Read data from World Bank PIP format (Excel or CSV)
 - Filter to the most recent year for each country with complete data
 - Fit all 5 Lorenz curve types (pareto_1, ortega_2, gq_3, beta_3, sarabia_3)
-- Generate output in timestamped directories: `data/output/{lorenz_type}_{timestamp}/`
+- Generate output in timestamped directories: `data/output/{lorenz_type}_{error_type}_{fit_method}_{timestamp}/`
 
 Each run tests all Lorenz curve types and saves results separately, allowing you to compare their performance.
+
+### Command-Line Options
+
+#### Basic Usage
+
+```bash
+python main.py <input_file> [lorenz_types] [--error-type=TYPE] [--cumulative]
+```
+
+**Arguments:**
+
+- `input_file` (required): Path to Excel/CSV file with income distribution data
+- `lorenz_types` (optional): Comma-separated list of curve types to fit
+  - Options: `pareto_1`, `ortega_2`, `gq_3`, `beta_3`, `sarabia_3`
+  - Default: all five types
+- `--error-type=TYPE` (optional): Error metric for global fitting
+  - Options: `hybrid`, `absolute`, `fractional`
+  - Default: `hybrid`
+- `--cumulative` (optional): Fit global curve on cumulative L(p) values instead of income shares
+  - Default: fit on income shares
+
+#### Examples
+
+**Fit specific Lorenz curve types:**
+```bash
+# Fit only beta_3
+python main.py data/input/pip_2025-12-28.xlsx beta_3
+
+# Fit ortega_2 and beta_3
+python main.py data/input/pip_2025-12-28.xlsx ortega_2,beta_3
+```
+
+**Change error metric for global fitting:**
+```bash
+# Use absolute error instead of hybrid
+python main.py data/input/pip_2025-12-28.xlsx ortega_2 --error-type=absolute
+
+# Use fractional error
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=fractional
+```
+
+**Fit on cumulative L(p) values:**
+```bash
+# Fit beta_3 on cumulative L(p) with hybrid error
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --cumulative
+
+# Fit on cumulative L(p) with absolute error
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --cumulative
+```
+
+#### Fitting Strategies
+
+The package supports two orthogonal fitting dimensions for global Lorenz curves:
+
+1. **Fitting Target** (what to fit):
+   - **Income shares** (default): Minimizes errors on income in each bin (approximately fitting dL/dp)
+   - **Cumulative L(p)** (`--cumulative`): Minimizes errors on the Lorenz curve itself, preventing error accumulation across bins
+
+2. **Error Metric** (how to measure error):
+   - **Hybrid** (default): Minimizes product of absolute and relative errors = error²/value
+   - **Absolute**: Minimizes absolute errors
+   - **Fractional**: Minimizes relative/fractional errors
+
+These options are **orthogonal** - you can combine any fitting target with any error metric, giving you flexibility to optimize for different objectives:
+
+- **Default (shares + hybrid)**: Balanced fit across all income levels, good general-purpose choice
+- **Cumulative + hybrid**: Prevents error accumulation in L(p), good for applications using Lorenz curve values directly
+- **Shares + fractional**: Emphasizes relative accuracy in each bin
+- **Cumulative + absolute**: Minimizes absolute deviation of Lorenz curve from aggregated data
+
+**Note:** Country-level fitting always uses income shares with hybrid error.
 
 ### Expected Data Format
 

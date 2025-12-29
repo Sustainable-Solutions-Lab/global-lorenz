@@ -188,7 +188,7 @@ def resample_to_equal_population_bins(p, L, n_bins=100):
     return income_shares, population_shares
 
 
-def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
+def fit_global_lorenz(country_results, lorenz_type, income_thresholds, error_type='hybrid', fit_on_cumulative=False):
     """
     Fit a global Lorenz curve from country-level data.
 
@@ -235,6 +235,15 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
         - income_below: Total income below threshold
         - income_fraction: Cumulative income fraction (actual, aggregated)
         - income_fraction_fitted: Cumulative income fraction (fitted Lorenz curve)
+    fitted_bins_data : pandas DataFrame
+        Data for the 100 equal-population bins used for fitting with columns:
+        - bin_number: Bin index (0-99)
+        - population_share: Population share in this bin
+        - population_cumulative: Cumulative population fraction at bin end
+        - income_share_actual: Actual income share in this bin
+        - income_cumulative_actual: Actual cumulative income fraction at bin end
+        - income_share_fitted: Fitted income share in this bin
+        - income_cumulative_fitted: Fitted cumulative income fraction at bin end
     """
     # Aggregate to global distribution
     global_data = aggregate_global_distribution(
@@ -265,7 +274,7 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     (global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error,
      fractional_rmse, fractional_mafe, fractional_max_abs_error,
      absolute_rmse, absolute_mafe, absolute_max_abs_error) = fit_lorenz_curve_decile(
-        income_shares, lorenz_type, population_shares, error_type='hybrid'
+        income_shares, lorenz_type, population_shares, error_type=error_type, fit_on_cumulative=fit_on_cumulative
     )
     # # Other error type options (commented out):
     # global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
@@ -299,11 +308,27 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
         global_data['population_fraction'].values, *global_params
     )
 
+    # Create a separate DataFrame with just the 100 bins used for fitting
+    # This allows direct comparison of fitted vs actual at the fitting points
+    p_fitted = np.cumsum(np.concatenate([[0], population_shares]))
+    L_actual = np.cumsum(np.concatenate([[0], income_shares]))
+    L_fitted = global_lorenz_func(p_fitted, *global_params)
+
+    fitted_bins_data = pd.DataFrame({
+        'bin_number': range(len(income_shares)),
+        'population_share': population_shares,
+        'population_cumulative': p_fitted[1:],
+        'income_share_actual': income_shares,
+        'income_cumulative_actual': L_actual[1:],
+        'income_share_fitted': np.diff(L_fitted),
+        'income_cumulative_fitted': L_fitted[1:]
+    })
+
     return (global_params, global_lorenz_func, global_gini,
             rmse, mafe, max_abs_error,
             fractional_rmse, fractional_mafe, fractional_max_abs_error,
             absolute_rmse, absolute_mafe, absolute_max_abs_error,
-            global_data)
+            global_data, fitted_bins_data)
 
 
 def compute_global_poverty_metrics(country_results, lorenz_type, poverty_lines):
