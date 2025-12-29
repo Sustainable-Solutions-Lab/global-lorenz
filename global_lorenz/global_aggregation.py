@@ -228,15 +228,23 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     # This avoids tiny bins at extremes that would dominate errors
     income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=10)
 
-    # Fit global Lorenz curve using population-weighted ABSOLUTE error
-    # NOTE: To switch back to FRACTIONAL error, change use_absolute_error=False
+    # Fit global Lorenz curve using INTERMEDIATE error weighting
+    # This weights by both population AND income, balancing importance across bins
+    #
+    # Error type options:
+    # - 'intermediate': weight = pop * income, error = absolute  [RECOMMENDED]
+    # - 'absolute':     weight = pop,          error = absolute
+    # - 'fractional':   weight = pop,          error = fractional
     from .lorenz_curves import fit_lorenz_curve_decile
     global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
-        income_shares, lorenz_type, population_shares, use_absolute_error=True
+        income_shares, lorenz_type, population_shares, error_type='intermediate'
     )
-    # # FRACTIONAL ERROR version (commented out):
+    # # Other error type options (commented out):
     # global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
-    #     income_shares, lorenz_type, population_shares, use_absolute_error=False
+    #     income_shares, lorenz_type, population_shares, error_type='absolute'
+    # )
+    # global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
+    #     income_shares, lorenz_type, population_shares, error_type='fractional'
     # )
 
     n_params = int(lorenz_type.split('_')[1])

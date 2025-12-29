@@ -217,13 +217,15 @@ def gini_from_params(lorenz_func, params):
     return gini
 
 
-def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, use_absolute_error=False):
+def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, error_type='intermediate'):
     """
-    Fit a Lorenz curve to income share data using population-weighted error objective.
+    Fit a Lorenz curve to income share data using weighted error objective.
 
-    Minimizes sum over bins of: pop_weight[i] * error^2
-    where error = (predicted_share / actual_share) - 1  [fractional]
-       or error = predicted_share - actual_share         [absolute]
+    Minimizes sum over bins of: weight[i] * error^2
+    where weight and error depend on error_type:
+    - 'fractional': weight = pop[i], error = (pred/actual - 1)
+    - 'absolute':   weight = pop[i], error = (pred - actual)
+    - 'intermediate': weight = pop[i] * income[i], error = (pred - actual)
 
     This objective function can handle both equal-population bins (country-level deciles)
     and unequal-population bins (global aggregated data).
@@ -237,9 +239,11 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     population_shares : array_like, optional
         Population share for each bin (should sum to approximately 1)
         If None, assumes equal population bins (1/n_bins for each)
-    use_absolute_error : bool, optional
-        If True, use absolute error (predicted - actual)
-        If False, use fractional error ((predicted/actual) - 1)  [default]
+    error_type : str, optional
+        Type of error objective:
+        - 'fractional': fractional error weighted by population
+        - 'absolute': absolute error weighted by population
+        - 'intermediate': absolute error weighted by population * income [default]
 
     Returns:
     --------
@@ -250,9 +254,9 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     gini : float
         Gini coefficient from fitted curve
     rmse : float
-        Root mean squared error (population-weighted, fractional or absolute)
+        Root mean squared error (weighted)
     mafe : float
-        Mean absolute error (population-weighted, fractional or absolute)
+        Mean absolute error (weighted)
     max_abs_error : float
         Maximum absolute error across all bins
     """
@@ -297,9 +301,9 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     # Compute cumulative population shares for bin boundaries
     p_cumulative = np.concatenate([[0], np.cumsum(population_shares)])
 
-    # Define population-weighted error objective function
-    if use_absolute_error:
-        # ABSOLUTE ERROR: minimize sum of pop_weight[i] * (predicted - actual)^2
+    # Define weighted error objective function
+    if error_type == 'absolute':
+        # ABSOLUTE ERROR: weight = pop[i], error = (predicted - actual)
         def objective(params):
             total_squared_error = 0.0
             for i in range(n_bins):
@@ -313,12 +317,34 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
                 actual_share = income_shares[i]
 
                 absolute_error = predicted_share - actual_share
-                total_squared_error += population_shares[i] * absolute_error ** 2
+                weight = population_shares[i]
+                total_squared_error += weight * absolute_error ** 2
 
             return total_squared_error
-    else:
-        # FRACTIONAL ERROR: minimize sum of pop_weight[i] * ((predicted/actual) - 1)^2
-        # Commented out to easily switch back if needed
+
+    elif error_type == 'intermediate':
+        # INTERMEDIATE: weight = pop[i] * income[i], error = (predicted - actual)
+        # This balances importance across bins based on both people and income
+        def objective(params):
+            total_squared_error = 0.0
+            for i in range(n_bins):
+                p_lower = p_cumulative[i]
+                p_upper = p_cumulative[i + 1]
+
+                L_lower = lorenz_func(p_lower, *params)
+                L_upper = lorenz_func(p_upper, *params)
+
+                predicted_share = L_upper - L_lower
+                actual_share = income_shares[i]
+
+                absolute_error = predicted_share - actual_share
+                weight = population_shares[i] * income_shares[i]
+                total_squared_error += weight * absolute_error ** 2
+
+            return total_squared_error
+
+    else:  # error_type == 'fractional'
+        # FRACTIONAL ERROR: weight = pop[i], error = (predicted/actual - 1)
         def objective(params):
             total_squared_error = 0.0
             for i in range(n_bins):
@@ -336,7 +362,8 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
                     continue
 
                 fractional_error = (predicted_share / actual_share) - 1.0
-                total_squared_error += population_shares[i] * fractional_error ** 2
+                weight = population_shares[i]
+                total_squared_error += weight * fractional_error ** 2
 
             return total_squared_error
 
@@ -349,26 +376,8 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     )
     params = tuple(result.x)
 
-    # Calculate population-weighted goodness-of-fit statistics
-    if use_absolute_error:
-        # ABSOLUTE ERROR statistics
-        errors = []
-        for i in range(n_bins):
-            p_lower = p_cumulative[i]
-            p_upper = p_cumulative[i + 1]
-            L_lower = lorenz_func(p_lower, *params)
-            L_upper = lorenz_func(p_upper, *params)
-            predicted_share = L_upper - L_lower
-            actual_share = income_shares[i]
-
-            absolute_error = predicted_share - actual_share
-            errors.append(absolute_error)
-
-        errors = np.array(errors)
-        rmse = np.sqrt(np.sum(population_shares * errors ** 2))
-        mafe = np.sum(population_shares * np.abs(errors))
-        max_abs_error = np.max(np.abs(errors))
-    else:
+    # Calculate weighted goodness-of-fit statistics
+    if error_type == 'fractional':
         # FRACTIONAL ERROR statistics
         fractional_errors = []
         valid_pop_shares = []
@@ -401,6 +410,35 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
             rmse = 0.0
             mafe = 0.0
             max_abs_error = 0.0
+
+    else:
+        # ABSOLUTE or INTERMEDIATE error statistics
+        errors = []
+        weights = []
+        for i in range(n_bins):
+            p_lower = p_cumulative[i]
+            p_upper = p_cumulative[i + 1]
+            L_lower = lorenz_func(p_lower, *params)
+            L_upper = lorenz_func(p_upper, *params)
+            predicted_share = L_upper - L_lower
+            actual_share = income_shares[i]
+
+            absolute_error = predicted_share - actual_share
+            errors.append(absolute_error)
+
+            if error_type == 'intermediate':
+                weight = population_shares[i] * income_shares[i]
+            else:  # 'absolute'
+                weight = population_shares[i]
+            weights.append(weight)
+
+        errors = np.array(errors)
+        weights = np.array(weights)
+        weights = weights / np.sum(weights)  # Normalize
+
+        rmse = np.sqrt(np.sum(weights * errors ** 2))
+        mafe = np.sum(weights * np.abs(errors))
+        max_abs_error = np.max(np.abs(errors))
 
     # Calculate Gini coefficient
     gini = gini_from_params(lorenz_func, params)
