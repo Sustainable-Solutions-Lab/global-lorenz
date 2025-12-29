@@ -51,7 +51,7 @@ def aggregate_global_distribution(country_results,
         income_thresholds = np.logspace(
             np.log10(min_income),
             np.log10(max_income),
-            100  # Using 100 bins for faster testing (was 1000)
+            1000  # High resolution for accurate aggregation
         )
     
     income_thresholds = np.asarray(income_thresholds)
@@ -221,12 +221,12 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
         'population',
     )
 
-    # Convert to Lorenz curve format (high-resolution: ~100 bins)
+    # Convert to Lorenz curve format (high-resolution: ~1000 bins)
     p, L = global_distribution_to_lorenz(global_data)
 
-    # Resample to equal-population bins (10 bins = deciles, consistent with country-level)
-    # This avoids tiny bins at extremes that would dominate errors
-    income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=10)
+    # Resample to equal-population bins (100 bins = percentiles)
+    # This provides good resolution while avoiding tiny bins at extremes
+    income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=100)
 
     # Fit global Lorenz curve using HYBRID error
     # This minimizes the product of absolute and relative errors: (pred - actual)² / actual
