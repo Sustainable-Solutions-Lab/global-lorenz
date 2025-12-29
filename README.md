@@ -4,10 +4,15 @@ Fit global Lorenz curves to World Bank income distribution data.
 
 ## Features
 
-- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries
-- **Multiple functional forms**: Support for 1, 2, or 3 parameter Lorenz curves
+- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries using a fractional error objective that gives equal weight to all deciles
+- **Multiple functional forms**: Support for 5 different Lorenz curve types:
+  - 1-parameter: Pareto (`pareto_1`)
+  - 2-parameter: Ortega/Jantzen-Volpert (`ortega_2`)
+  - 3-parameter: Generalized Quadratic (`gq_3`), Beta (`beta_3`), Sarabia (`sarabia_3`)
+- **Goodness-of-fit statistics**: RMSE, mean absolute fractional error, and maximum absolute fractional error for each country
 - **Global aggregation**: Aggregate country-level distributions to create a global income distribution
 - **Global Lorenz curve**: Fit a Lorenz curve to the aggregated global distribution
+- **Comprehensive output**: CSV files include actual vs fitted decile shares, year, and fit quality metrics
 - **Poverty metrics**: Calculate global poverty headcount at various poverty lines
 
 ## Installation
@@ -30,16 +35,13 @@ pip install -e .
 python main.py data/input/pip_2025-12-28.xlsx
 ```
 
-Or with the CSV version:
+This will automatically:
+- Read data from World Bank PIP format (Excel or CSV)
+- Filter to the most recent year for each country with complete data
+- Fit all 5 Lorenz curve types (pareto_1, ortega_2, gq_3, beta_3, sarabia_3)
+- Generate output in timestamped directories: `data/output/{lorenz_type}_{timestamp}/`
 
-```bash
-python main.py data/input/pip.csv
-```
-
-The script automatically:
-- Reads data from World Bank PIP format (Excel or CSV)
-- Filters to the most recent year for each country with complete data
-- Fits Lorenz curves at country and global levels
+Each run tests all Lorenz curve types and saves results separately, allowing you to compare their performance.
 
 ### Expected Data Format
 
@@ -214,13 +216,46 @@ With constraints: 0 < a, b, c < 1
 
 ## Output
 
-The workflow generates:
+The workflow generates timestamped output directories (e.g., `data/output/ortega_2_20251228-140106/`) containing:
 
-1. **country_results_Nparam.csv**: Fitted parameters and Gini coefficients for each country
-2. **global_distribution.csv**: Global income distribution data
-3. **country_lorenz_curves.png**: Sample country Lorenz curves
-4. **global_lorenz_curve.png**: Fitted global Lorenz curve
-5. **summary_report.txt**: Summary statistics and results
+### Files Generated
+
+1. **`country_results_{lorenz_type}.csv`**: Country-level fit results with columns:
+   - `country`: Country name
+   - `year`: Reporting year for the data
+   - `gini`: Gini coefficient
+   - `rmse`: Root mean squared fractional error
+   - `mafe`: Mean absolute fractional error
+   - `max_abs_error`: Maximum absolute fractional error across deciles
+   - `param_1`, `param_2`, `param_3`: Fitted Lorenz curve parameters
+   - `gdp`, `population`: Country economic data
+   - `decile1_actual` ... `decile10_actual`: Input income shares
+   - `decile1_fitted` ... `decile10_fitted`: Predicted income shares from fitted curve
+
+2. **`global_distribution_{lorenz_type}.csv`**: Global income distribution data
+
+3. **`country_lorenz_curves_{lorenz_type}.png`**: Sample country Lorenz curve plots
+
+4. **`global_lorenz_curve_{lorenz_type}.png`**: Fitted global Lorenz curve plot
+
+5. **`summary_report_{lorenz_type}.txt`**: Summary statistics including:
+   - Country-level Gini statistics (mean, median)
+   - Country-level RMSE statistics (mean, std, min, max)
+   - Global Gini coefficient
+   - Fitted parameter values
+
+### Interpreting Goodness-of-Fit Statistics
+
+All error metrics are **fractional (relative) errors**, not absolute errors:
+
+- **RMSE = 0.05**: ~5% root mean squared fractional error across deciles
+- **MAFE = 0.03**: On average, predicted decile shares differ from actual by 3%
+- **max_abs_error = 0.15**: The worst-fit decile has 15% relative error
+
+**Example:** If a decile has actual share = 0.05 and predicted share = 0.055:
+- Fractional error = (0.055/0.05) - 1 = 0.10 (10% error)
+
+This fractional error objective gives **equal weight to all deciles** - fitting the small first decile (e.g., 2% of income) just as well as the large tenth decile (e.g., 30% of income).
 
 ## Theory
 

@@ -78,10 +78,11 @@ def plot_lorenz_curves(country_results, lorenz_type, output_dir):
         ax.set_ylim(0, 1)
     
     plt.tight_layout()
-    plt.savefig(output_dir / 'country_lorenz_curves.png', dpi=300, bbox_inches='tight')
+    filename = f'country_lorenz_curves_{lorenz_type}.png'
+    plt.savefig(output_dir / filename, dpi=300, bbox_inches='tight')
     plt.close()
-    
-    print(f"Saved country Lorenz curves to {output_dir / 'country_lorenz_curves.png'}")
+
+    print(f"Saved country Lorenz curves to {output_dir / filename}")
 
 
 def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
@@ -125,10 +126,11 @@ def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     ax.set_ylim(0, 1)
     
     plt.tight_layout()
-    plt.savefig(output_dir / 'global_lorenz_curve.png', dpi=300, bbox_inches='tight')
+    filename = f'global_lorenz_curve_{lorenz_type}.png'
+    plt.savefig(output_dir / filename, dpi=300, bbox_inches='tight')
     plt.close()
-    
-    print(f"Saved global Lorenz curve to {output_dir / 'global_lorenz_curve.png'}")
+
+    print(f"Saved global Lorenz curve to {output_dir / filename}")
 
 
 def run_workflow(input_file, income_cols, lorenz_type):
@@ -196,8 +198,9 @@ def run_workflow(input_file, income_cols, lorenz_type):
     )
 
     # Save global data
-    global_data.to_csv(output_dir / 'global_distribution.csv', index=False)
-    print(f"   Saved global distribution to {output_dir / 'global_distribution.csv'}")
+    filename = f'global_distribution_{lorenz_type}.csv'
+    global_data.to_csv(output_dir / filename, index=False)
+    print(f"   Saved global distribution to {output_dir / filename}")
 
     # Step 5: Plot global Lorenz curve
     print("\n5. Plotting global Lorenz curve...")
@@ -212,8 +215,14 @@ def run_workflow(input_file, income_cols, lorenz_type):
     report.append("=" * 70)
     report.append(f"\nLorenz curve type: {lorenz_type}")
     report.append(f"Number of countries: {len(country_results)}")
-    report.append(f"Mean country Gini: {country_results['gini'].mean():.4f}")
-    report.append(f"Median country Gini: {country_results['gini'].median():.4f}")
+    report.append(f"\nCountry-level Gini statistics:")
+    report.append(f"  Mean: {country_results['gini'].mean():.4f}")
+    report.append(f"  Median: {country_results['gini'].median():.4f}")
+    report.append(f"\nCountry-level RMSE statistics:")
+    report.append(f"  Mean: {country_results['rmse'].mean():.4f}")
+    report.append(f"  Std: {country_results['rmse'].std():.4f}")
+    report.append(f"  Min: {country_results['rmse'].min():.4f}")
+    report.append(f"  Max: {country_results['rmse'].max():.4f}")
     report.append(f"\nGlobal Gini coefficient: {global_gini:.4f}")
     report.append(f"\nGlobal Lorenz curve parameters:")
     for i, param in enumerate(global_params):
@@ -222,8 +231,9 @@ def run_workflow(input_file, income_cols, lorenz_type):
     
     report_text = "\n".join(report)
     print(report_text)
-    
-    with open(output_dir / 'summary_report.txt', 'w') as f:
+
+    filename = f'summary_report_{lorenz_type}.txt'
+    with open(output_dir / filename, 'w') as f:
         f.write(report_text)
     
     print(f"\nWorkflow complete! Results saved to {output_dir}/")
