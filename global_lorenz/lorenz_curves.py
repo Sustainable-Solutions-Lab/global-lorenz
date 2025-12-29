@@ -258,11 +258,23 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
     gini : float
         Gini coefficient from fitted curve
     rmse : float
-        Root mean squared error (weighted)
+        Root mean squared error (weighted, based on error_type)
     mafe : float
-        Mean absolute error (weighted)
+        Mean absolute error (weighted, based on error_type)
     max_abs_error : float
-        Maximum absolute error across all bins
+        Maximum absolute error across all bins (based on error_type)
+    fractional_rmse : float or None
+        Root mean squared fractional error (only for error_type='hybrid')
+    fractional_mafe : float or None
+        Mean absolute fractional error (only for error_type='hybrid')
+    fractional_max_abs_error : float or None
+        Maximum absolute fractional error (only for error_type='hybrid')
+    absolute_rmse : float or None
+        Root mean squared absolute error (only for error_type='hybrid')
+    absolute_mafe : float or None
+        Mean absolute absolute error (only for error_type='hybrid')
+    absolute_max_abs_error : float or None
+        Maximum absolute absolute error (only for error_type='hybrid')
     """
     income_shares = np.asarray(income_shares)
     income_shares = income_shares / np.sum(income_shares)
@@ -409,10 +421,13 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
 
     # Calculate weighted goodness-of-fit statistics
     if error_type == 'hybrid':
-        # HYBRID ERROR statistics: (pred - actual)² / actual
-        errors = []
+        # Compute all three types of error statistics for comprehensive reporting
+        hybrid_errors = []
+        fractional_errors = []
+        absolute_errors = []
         weights = []
         valid_indices = []
+
         for i in range(n_bins):
             p_lower = p_cumulative[i]
             p_upper = p_cumulative[i + 1]
@@ -425,31 +440,38 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
             if actual_share < EPSILON:
                 continue
 
-            # Hybrid error: sqrt((pred - actual)² / actual) = |pred - actual| / sqrt(actual)
+            # Compute all three error types
             absolute_error = predicted_share - actual_share
+            fractional_error = (predicted_share / actual_share) - 1.0
             hybrid_error = absolute_error / np.sqrt(actual_share)
-            errors.append(hybrid_error)
+
+            absolute_errors.append(absolute_error)
+            fractional_errors.append(fractional_error)
+            hybrid_errors.append(hybrid_error)
             weights.append(population_shares[i])
             valid_indices.append(i)
 
-        errors = np.array(errors)
+        # Convert to arrays
+        hybrid_errors = np.array(hybrid_errors)
+        fractional_errors = np.array(fractional_errors)
+        absolute_errors = np.array(absolute_errors)
         weights = np.array(weights)
         weights = weights / np.sum(weights)  # Normalize
 
-        rmse = np.sqrt(np.sum(weights * errors ** 2))
-        mafe = np.sum(weights * np.abs(errors))
+        # Hybrid error statistics (optimized metric)
+        rmse = np.sqrt(np.sum(weights * hybrid_errors ** 2))
+        mafe = np.sum(weights * np.abs(hybrid_errors))
+        max_abs_error = np.max(np.abs(hybrid_errors))
 
-        # For max error, report actual absolute error (not hybrid) for interpretability
-        max_abs_error = 0.0
-        for i in valid_indices:
-            p_lower = p_cumulative[i]
-            p_upper = p_cumulative[i + 1]
-            L_lower = lorenz_func(p_lower, *params)
-            L_upper = lorenz_func(p_upper, *params)
-            predicted_share = L_upper - L_lower
-            actual_share = income_shares[i]
-            abs_err = abs(predicted_share - actual_share)
-            max_abs_error = max(max_abs_error, abs_err)
+        # Fractional error statistics
+        fractional_rmse = np.sqrt(np.sum(weights * fractional_errors ** 2))
+        fractional_mafe = np.sum(weights * np.abs(fractional_errors))
+        fractional_max_abs_error = np.max(np.abs(fractional_errors))
+
+        # Absolute error statistics
+        absolute_rmse = np.sqrt(np.sum(weights * absolute_errors ** 2))
+        absolute_mafe = np.sum(weights * np.abs(absolute_errors))
+        absolute_max_abs_error = np.max(np.abs(absolute_errors))
 
     elif error_type == 'fractional':
         # FRACTIONAL ERROR statistics
@@ -485,6 +507,14 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
             mafe = 0.0
             max_abs_error = 0.0
 
+        # Set other metrics to None for non-hybrid error types
+        fractional_rmse = None
+        fractional_mafe = None
+        fractional_max_abs_error = None
+        absolute_rmse = None
+        absolute_mafe = None
+        absolute_max_abs_error = None
+
     else:
         # ABSOLUTE or INTERMEDIATE error statistics
         errors = []
@@ -514,10 +544,20 @@ def fit_lorenz_curve_decile(income_shares, lorenz_type, population_shares=None, 
         mafe = np.sum(weights * np.abs(errors))
         max_abs_error = np.max(np.abs(errors))
 
+        # Set other metrics to None for non-hybrid error types
+        fractional_rmse = None
+        fractional_mafe = None
+        fractional_max_abs_error = None
+        absolute_rmse = None
+        absolute_mafe = None
+        absolute_max_abs_error = None
+
     # Calculate Gini coefficient
     gini = gini_from_params(lorenz_func, params)
 
-    return params, lorenz_func, gini, rmse, mafe, max_abs_error
+    return (params, lorenz_func, gini, rmse, mafe, max_abs_error,
+            fractional_rmse, fractional_mafe, fractional_max_abs_error,
+            absolute_rmse, absolute_mafe, absolute_max_abs_error)
 
 
 def fit_lorenz_curve(p_data, L_data, lorenz_type):

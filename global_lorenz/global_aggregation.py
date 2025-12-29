@@ -209,6 +209,24 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
         The fitted global Lorenz curve function
     global_gini : float
         Global Gini coefficient
+    rmse : float
+        Root mean squared hybrid error
+    mafe : float
+        Mean absolute hybrid error
+    max_abs_error : float
+        Maximum absolute hybrid error
+    fractional_rmse : float
+        Root mean squared fractional error
+    fractional_mafe : float
+        Mean absolute fractional error
+    fractional_max_abs_error : float
+        Maximum absolute fractional error
+    absolute_rmse : float
+        Root mean squared absolute error
+    absolute_mafe : float
+        Mean absolute absolute error
+    absolute_max_abs_error : float
+        Maximum absolute absolute error
     global_data : pandas DataFrame
         Global income distribution data
     """
@@ -238,7 +256,9 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     # - 'absolute':     weight by pop, absolute error
     # - 'fractional':   weight by pop, fractional error
     from .lorenz_curves import fit_lorenz_curve_decile
-    global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
+    (global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error,
+     fractional_rmse, fractional_mafe, fractional_max_abs_error,
+     absolute_rmse, absolute_mafe, absolute_max_abs_error) = fit_lorenz_curve_decile(
         income_shares, lorenz_type, population_shares, error_type='hybrid'
     )
     # # Other error type options (commented out):
@@ -255,11 +275,24 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     n_params = int(lorenz_type.split('_')[1])
     print(f"Global Lorenz curve fitted with {n_params} parameters")
     print(f"Global Gini coefficient: {global_gini:.4f}")
-    print(f"RMSE: {rmse:.6f}")
-    print(f"MAFE: {mafe:.6f}")
-    print(f"Max absolute error: {max_abs_error:.6f}")
+    print(f"\nHybrid error statistics (optimized metric):")
+    print(f"  RMSE: {rmse:.6f}")
+    print(f"  MAFE: {mafe:.6f}")
+    print(f"  Max absolute error: {max_abs_error:.6f}")
+    print(f"\nFractional error statistics:")
+    print(f"  RMSE: {fractional_rmse:.6f}")
+    print(f"  MAFE: {fractional_mafe:.6f}")
+    print(f"  Max absolute error: {fractional_max_abs_error:.6f}")
+    print(f"\nAbsolute error statistics:")
+    print(f"  RMSE: {absolute_rmse:.6f}")
+    print(f"  MAFE: {absolute_mafe:.6f}")
+    print(f"  Max absolute error: {absolute_max_abs_error:.6f}")
 
-    return global_params, global_lorenz_func, global_gini, global_data
+    return (global_params, global_lorenz_func, global_gini,
+            rmse, mafe, max_abs_error,
+            fractional_rmse, fractional_mafe, fractional_max_abs_error,
+            absolute_rmse, absolute_mafe, absolute_max_abs_error,
+            global_data)
 
 
 def compute_global_poverty_metrics(country_results, lorenz_type, poverty_lines):

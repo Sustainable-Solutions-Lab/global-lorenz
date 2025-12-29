@@ -128,7 +128,9 @@ class TestFitting:
         # Create synthetic decile data
         income_shares = np.array([0.02, 0.03, 0.04, 0.05, 0.07, 0.09, 0.12, 0.15, 0.18, 0.25])
 
-        params, lorenz_func, gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(income_shares, 'ortega_2')
+        (params, lorenz_func, gini, rmse, mafe, max_abs_error,
+         fractional_rmse, fractional_mafe, fractional_max_abs_error,
+         absolute_rmse, absolute_mafe, absolute_max_abs_error) = fit_lorenz_curve_decile(income_shares, 'ortega_2')
 
         # Check that parameters were fitted
         assert len(params) == 2

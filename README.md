@@ -4,17 +4,20 @@ Fit global Lorenz curves to World Bank income distribution data.
 
 ## Features
 
-- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries using a population-weighted fractional error objective that gives equal weight to all deciles
+- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries using a hybrid error objective that balances fitting quality across all income levels
 - **Multiple functional forms**: Support for 5 different Lorenz curve types:
   - 1-parameter: Pareto (`pareto_1`)
   - 2-parameter: Ortega/Jantzen-Volpert (`ortega_2`)
   - 3-parameter: Generalized Quadratic (`gq_3`), Beta (`beta_3`), Sarabia (`sarabia_3`)
-- **Goodness-of-fit statistics**: RMSE, mean absolute fractional error, and maximum absolute fractional error for each country
-- **Global aggregation**: Aggregate country-level distributions to create a global income distribution
-- **Global Lorenz curve**: Fit a Lorenz curve to the aggregated global distribution using the same population-weighted methodology as country-level fitting
-- **Unified methodology**: Both country and global fits use the same fractional error objective, ensuring consistency across scales
+- **Hybrid error objective**: Minimizes the product of absolute and relative errors, automatically balancing importance across poor and rich deciles without manual tuning
+- **Goodness-of-fit statistics**: RMSE, mean absolute error, and maximum absolute error for each country and global fit
+- **High-resolution global aggregation**: Aggregate country-level distributions at 1000 income thresholds, capturing detailed global income distribution
+- **Global Lorenz curve**: Resample to 100 equal-population bins and fit using hybrid error objective for balanced representation
+- **Unified methodology**: Both country and global fits use the same hybrid error objective, ensuring consistency across scales
 - **Comprehensive output**: CSV files include actual vs fitted decile shares, year, and fit quality metrics
+- **Dual-scale visualization**: Linear and log-scale plots of global Lorenz curves for detailed analysis
 - **Poverty metrics**: Calculate global poverty headcount at various poverty lines
+- **Flexible curve selection**: Run all 5 curve types or select specific ones via command-line arguments
 
 ## Installation
 
@@ -271,39 +274,58 @@ A Lorenz curve L(p) represents the cumulative proportion of income held by the b
 
 ### Unified Fitting Methodology
 
-Both country-level and global-level Lorenz curves are fitted using the same **population-weighted fractional error objective**:
+Both country-level and global-level Lorenz curves use a **hybrid error objective** that balances fitting quality across all income levels:
 
 ```
-Minimize: Σᵢ wᵢ · ((predicted_shareᵢ / actual_shareᵢ) - 1)²
+Minimize: Σᵢ population_shareᵢ · (predicted_shareᵢ - actual_shareᵢ)² / actual_shareᵢ
 ```
 
-Where:
-- `wᵢ` = population weight for bin i
-- `predicted_shareᵢ` = L(pᵢ₊₁) - L(pᵢ) from fitted curve
-- `actual_shareᵢ` = observed income share in bin i
+This hybrid objective minimizes the **product of absolute and relative errors**, providing:
+- **Balanced importance**: Small income bins (poor deciles) are automatically upweighted, large bins (rich deciles) are downweighted
+- **Natural weighting**: No manual tuning needed - the division by `actual_shareᵢ` gives appropriate emphasis across the distribution
+- **Numerical stability**: Unlike pure fractional error, this avoids division-by-zero issues while still emphasizing fit quality for small bins
+
+**Mathematical equivalence:**
+```
+Hybrid error² = (absolute_error)² / actual_share
+              = [(predicted - actual) / actual]² × actual_share
+              = (relative_error)² × actual_share
+```
+
+**Key insight**: For equal-population bins, this is equivalent to **weighting the squared relative error by the income share in each bin**. This means:
+- Bins with more income (rich deciles) contribute more to the total error
+- Bins with less income (poor deciles) contribute less, but their relative errors are squared
+- The result is natural balance: fitting quality matters everywhere, but economic importance scales with income
 
 **Country-level fitting:**
-- Each decile has equal population weight (wᵢ = 0.1)
-- This gives equal importance to fitting all deciles, regardless of their absolute income size
-- Prevents the optimizer from only fitting large deciles well while ignoring small ones
+- Uses 10 equal-population bins (deciles)
+- Each decile has equal population weight (0.1)
+- Hybrid error ensures good fit across all income levels
 
 **Global-level fitting:**
-- Population weights vary by bin (wᵢ = pᵢ₊₁ - pᵢ)
-- Bins with more people receive higher weight in the objective
-- Ensures the global fit accurately represents where most of the world's population lives
-
-This unified approach ensures methodological consistency across scales while appropriately accounting for population distribution.
+1. Aggregate country distributions at 1000 income thresholds
+2. Resample to 100 equal-population bins (percentiles) for fitting
+3. Apply hybrid error objective with population weighting
+4. Result: Balanced global fit that accurately represents both poor and rich populations
 
 ### Global Aggregation
 
-The global distribution is computed by:
+The global distribution is computed by tracking both cumulative population and cumulative income:
 
-1. For each income threshold y
-2. For each country with mean income μ_c
-3. Calculate the fraction of country population with income < y using the country Lorenz curve
-4. Sum across all countries weighted by population
-5. Result: global cumulative distribution function
-6. Fit global Lorenz curve to this distribution using population-weighted objective
+1. Create 1000 income thresholds spanning global income range (log-spaced)
+2. For each income threshold y and each country c:
+   - Convert y to fraction of country mean income: y/μ_c
+   - Find population fraction below y using country's fitted Lorenz curve
+   - Find income fraction below y using country's Lorenz curve: L(p)
+   - Add to global totals: cumulative_pop += p_c × pop_c, cumulative_income += L(p_c) × income_c
+3. Normalize to get global (p, L) Lorenz curve with ~1000 data points
+4. Resample to 100 equal-population bins (percentiles)
+5. Fit global Lorenz curve using hybrid error objective
+
+This approach correctly tracks the global income distribution by:
+- Using fitted country Lorenz curves to interpolate within each country
+- Aggregating both population AND income across countries
+- Resampling to equal-population bins to avoid numerical issues with tiny bins
 
 ### Applications
 

@@ -131,8 +131,10 @@ def fit_country_lorenz_curves(data_df, income_cols, lorenz_type):
             continue
 
         try:
-            # Fit Lorenz curve using fractional error objective
-            params, lorenz_func, gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(income_shares, lorenz_type)
+            # Fit Lorenz curve using hybrid error objective
+            (params, lorenz_func, gini, rmse, mafe, max_abs_error,
+             fractional_rmse, fractional_mafe, fractional_max_abs_error,
+             absolute_rmse, absolute_mafe, absolute_max_abs_error) = fit_lorenz_curve_decile(income_shares, lorenz_type)
 
             result = {
                 'country': country_name,

@@ -147,7 +147,7 @@ def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
             label='Fitted global Lorenz curve', linewidth=2)
 
     # Perfect equality line
-    ax.plot([0, 1], [1e-6, 1], 'k--', label='Perfect equality', alpha=0.5)
+    ax.plot([1e-6, 1], [1e-6, 1], 'k--', label='Perfect equality', alpha=0.5)
 
     ax.set_xlabel('Cumulative population fraction', fontsize=12)
     ax.set_ylabel('Cumulative income fraction (log scale)', fontsize=12)
@@ -224,7 +224,11 @@ def run_workflow(input_file, income_cols, lorenz_type):
     
     # Step 4: Aggregate to global distribution
     print(f"\n4. Aggregating to global distribution...")
-    global_params, global_lorenz_func, global_gini, global_data = fit_global_lorenz(
+    (global_params, global_lorenz_func, global_gini,
+     global_rmse, global_mafe, global_max_abs_error,
+     global_fractional_rmse, global_fractional_mafe, global_fractional_max_abs_error,
+     global_absolute_rmse, global_absolute_mafe, global_absolute_max_abs_error,
+     global_data) = fit_global_lorenz(
         country_results,
         lorenz_type,
         None,
@@ -257,6 +261,19 @@ def run_workflow(input_file, income_cols, lorenz_type):
     report.append(f"  Min: {country_results['rmse'].min():.4f}")
     report.append(f"  Max: {country_results['rmse'].max():.4f}")
     report.append(f"\nGlobal Gini coefficient: {global_gini:.4f}")
+    report.append(f"\nGlobal goodness-of-fit statistics:")
+    report.append(f"  Hybrid error (optimized metric):")
+    report.append(f"    RMSE: {global_rmse:.6f}")
+    report.append(f"    MAFE: {global_mafe:.6f}")
+    report.append(f"    Max absolute error: {global_max_abs_error:.6f}")
+    report.append(f"  Fractional error:")
+    report.append(f"    RMSE: {global_fractional_rmse:.6f}")
+    report.append(f"    MAFE: {global_fractional_mafe:.6f}")
+    report.append(f"    Max absolute error: {global_fractional_max_abs_error:.6f}")
+    report.append(f"  Absolute error:")
+    report.append(f"    RMSE: {global_absolute_rmse:.6f}")
+    report.append(f"    MAFE: {global_absolute_mafe:.6f}")
+    report.append(f"    Max absolute error: {global_absolute_max_abs_error:.6f}")
     report.append(f"\nGlobal Lorenz curve parameters:")
     for i, param in enumerate(global_params):
         report.append(f"  Parameter {i+1}: {param:.6f}")
@@ -270,8 +287,11 @@ def run_workflow(input_file, income_cols, lorenz_type):
         f.write(report_text)
     
     print(f"\nWorkflow complete! Results saved to {output_dir}/")
-    
-    return country_results, global_params, global_gini
+
+    return (country_results, global_params, global_gini,
+            global_rmse, global_mafe, global_max_abs_error,
+            global_fractional_rmse, global_fractional_mafe, global_fractional_max_abs_error,
+            global_absolute_rmse, global_absolute_mafe, global_absolute_max_abs_error)
 
 
 if __name__ == '__main__':
