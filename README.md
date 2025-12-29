@@ -52,7 +52,7 @@ Each run tests all Lorenz curve types and saves results separately, allowing you
 #### Basic Usage
 
 ```bash
-python main.py <input_file> [lorenz_types] [--error-type=TYPE] [--cumulative]
+python main.py <input_file> [lorenz_types] [options]
 ```
 
 **Arguments:**
@@ -61,11 +61,18 @@ python main.py <input_file> [lorenz_types] [--error-type=TYPE] [--cumulative]
 - `lorenz_types` (optional): Comma-separated list of curve types to fit
   - Options: `pareto_1`, `ortega_2`, `gq_3`, `beta_3`, `sarabia_3`
   - Default: all five types
+
+**Options:**
+
 - `--error-type=TYPE` (optional): Error metric for global fitting
   - Options: `hybrid`, `absolute`, `fractional`
   - Default: `hybrid`
 - `--cumulative` (optional): Fit global curve on cumulative L(p) values instead of income shares
   - Default: fit on income shares
+- `--agg-bins=N` (optional): Number of bins for high-resolution aggregation
+  - Default: `1000`
+- `--fit-bins=N` (optional): Number of equal-population bins for fitting
+  - Default: `100`
 
 #### Examples
 
@@ -94,6 +101,18 @@ python main.py data/input/pip_2025-12-28.xlsx beta_3 --cumulative
 
 # Fit on cumulative L(p) with absolute error
 python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --cumulative
+```
+
+**Customize number of bins:**
+```bash
+# Use 10 equal-population bins for fitting (deciles)
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --fit-bins=10
+
+# Use 500 aggregation bins and 10 fitting bins
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --agg-bins=500 --fit-bins=10
+
+# Combine with other options
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --fit-bins=10 --cumulative
 ```
 
 #### Fitting Strategies

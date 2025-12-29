@@ -14,7 +14,8 @@ from .country_fitting import evaluate_country_lorenz
 def aggregate_global_distribution(country_results,
                                    lorenz_type,
                                    income_thresholds,
-                                   gdp_col, pop_col):
+                                   gdp_col, pop_col,
+                                   n_agg_bins=1000):
     """
     Aggregate country-level distributions to create global distribution.
 
@@ -34,6 +35,8 @@ def aggregate_global_distribution(country_results,
         Column name for GDP data
     pop_col : str
         Column name for population data
+    n_agg_bins : int, optional
+        Number of bins for high-resolution aggregation [default: 1000]
 
     Returns:
     --------
@@ -51,7 +54,7 @@ def aggregate_global_distribution(country_results,
         income_thresholds = np.logspace(
             np.log10(min_income),
             np.log10(max_income),
-            1000  # High resolution for accurate aggregation
+            n_agg_bins  # High resolution for accurate aggregation
         )
     
     income_thresholds = np.asarray(income_thresholds)
@@ -151,7 +154,7 @@ def global_distribution_to_lorenz(global_data):
     return p, L
 
 
-def resample_to_equal_population_bins(p, L, n_bins=100):
+def resample_to_equal_population_bins(p, L, n_bins):
     """
     Resample Lorenz curve data to equal-population bins.
 
@@ -166,7 +169,7 @@ def resample_to_equal_population_bins(p, L, n_bins=100):
     L : array
         Cumulative income fractions (corresponding to p)
     n_bins : int
-        Number of equal-population bins to create (default: 100)
+        Number of equal-population bins to create
 
     Returns:
     --------
@@ -188,7 +191,8 @@ def resample_to_equal_population_bins(p, L, n_bins=100):
     return income_shares, population_shares
 
 
-def fit_global_lorenz(country_results, lorenz_type, income_thresholds, error_type='hybrid', fit_on_cumulative=False):
+def fit_global_lorenz(country_results, lorenz_type, income_thresholds, error_type='hybrid', fit_on_cumulative=False,
+                      n_agg_bins=1000, n_fit_bins=100):
     """
     Fit a global Lorenz curve from country-level data.
 
@@ -200,6 +204,15 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds, error_typ
         Lorenz curve type: 'pareto_1', 'ortega_2', 'gq_3', 'beta_3', or 'sarabia_3'
     income_thresholds : array_like
         Income levels to evaluate for aggregation
+    error_type : str, optional
+        Error metric for fitting [default: 'hybrid']
+        Options: 'hybrid', 'absolute', 'fractional'
+    fit_on_cumulative : bool, optional
+        If True, fit on cumulative L(p) values [default: False]
+    n_agg_bins : int, optional
+        Number of bins for high-resolution aggregation [default: 1000]
+    n_fit_bins : int, optional
+        Number of equal-population bins for fitting [default: 100]
 
     Returns:
     --------
@@ -252,14 +265,15 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds, error_typ
         income_thresholds,
         'gdp',
         'population',
+        n_agg_bins=n_agg_bins,
     )
 
-    # Convert to Lorenz curve format (high-resolution: ~1000 bins)
+    # Convert to Lorenz curve format (high-resolution)
     p, L = global_distribution_to_lorenz(global_data)
 
-    # Resample to equal-population bins (100 bins = percentiles)
+    # Resample to equal-population bins
     # This provides good resolution while avoiding tiny bins at extremes
-    income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=100)
+    income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=n_fit_bins)
 
     # Fit global Lorenz curve using HYBRID error
     # This minimizes the product of absolute and relative errors: (pred - actual)² / actual

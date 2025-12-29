@@ -166,7 +166,8 @@ def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     print(f"Saved global Lorenz curve (log scale) to {output_dir / filename_log}")
 
 
-def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid', global_fit_on_cumulative=False):
+def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid', global_fit_on_cumulative=False,
+                 n_agg_bins=1000, n_fit_bins=100):
     """
     Run the complete workflow.
 
@@ -190,11 +191,15 @@ def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid
     global_fit_on_cumulative : bool, optional
         If True, fit global curve on cumulative L(p) values directly.
         If False (default), fit on income shares.
+    n_agg_bins : int, optional
+        Number of bins for high-resolution aggregation [default: 1000]
+    n_fit_bins : int, optional
+        Number of equal-population bins for fitting [default: 100]
     """
     # Create timestamped output directory
     fit_method = 'cumulative' if global_fit_on_cumulative else 'shares'
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_dir = Path('data/output') / f"{lorenz_type}_{global_error_type}_{fit_method}_{timestamp}"
+    output_dir = Path('data/output') / f"{lorenz_type}_{global_error_type}_{fit_method}_agg{n_agg_bins}_fit{n_fit_bins}_{timestamp}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
@@ -241,6 +246,8 @@ def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid
         None,
         error_type=global_error_type,
         fit_on_cumulative=global_fit_on_cumulative,
+        n_agg_bins=n_agg_bins,
+        n_fit_bins=n_fit_bins,
     )
 
     # Save global data
@@ -272,8 +279,8 @@ def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid
     report.append(f"    Fitting target: income shares")
     report.append(f"    Error metric: hybrid (minimizes product of absolute and relative errors)")
     report.append(f"  Global-level:")
-    report.append(f"    High-resolution aggregation bins: 1000")
-    report.append(f"    Equal-population bins for fitting: 100 (percentiles)")
+    report.append(f"    High-resolution aggregation bins: {n_agg_bins}")
+    report.append(f"    Equal-population bins for fitting: {n_fit_bins}")
     report.append(f"    Fitting target: {'cumulative L(p) values' if global_fit_on_cumulative else 'income shares'}")
     report.append(f"    Error metric: {global_error_type}")
     report.append(f"\nNote: Error statistics are computed on the fitting target.")
@@ -331,22 +338,29 @@ def run_workflow(input_file, income_cols, lorenz_type, global_error_type='hybrid
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python main.py <input_file> [lorenz_types] [--error-type=TYPE] [--cumulative]")
+        print("Usage: python main.py <input_file> [lorenz_types] [options]")
         print("\nArguments:")
         print("  input_file       : Path to Excel/CSV file with income distribution data")
         print("  lorenz_types     : Optional comma-separated list of Lorenz curve types")
         print("                     Options: pareto_1, ortega_2, gq_3, beta_3, sarabia_3")
         print("                     Default: all five types")
+        print("\nOptions:")
         print("  --error-type=TYPE: Error metric for global fitting (hybrid, absolute, fractional)")
         print("                     Default: hybrid")
         print("  --cumulative     : Fit global curve on L(p) values instead of income shares")
         print("                     Default: fit on shares")
+        print("  --agg-bins=N     : Number of bins for high-resolution aggregation")
+        print("                     Default: 1000")
+        print("  --fit-bins=N     : Number of equal-population bins for fitting")
+        print("                     Default: 100")
         print("\nExamples:")
         print("  python main.py data/input/pip_2025-12-28.xlsx")
         print("  python main.py data/input/pip_2025-12-28.xlsx beta_3")
         print("  python main.py data/input/pip_2025-12-28.xlsx ortega_2,beta_3")
         print("  python main.py data/input/pip_2025-12-28.xlsx ortega_2 --error-type=absolute")
         print("  python main.py data/input/pip_2025-12-28.xlsx beta_3 --cumulative")
+        print("  python main.py data/input/pip_2025-12-28.xlsx beta_3 --fit-bins=10")
+        print("  python main.py data/input/pip_2025-12-28.xlsx beta_3 --agg-bins=500 --fit-bins=10")
         print("  python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --cumulative")
         sys.exit(1)
 
@@ -356,12 +370,18 @@ if __name__ == '__main__':
     lorenz_types = None
     global_error_type = 'hybrid'
     global_fit_on_cumulative = False
+    n_agg_bins = 1000
+    n_fit_bins = 100
 
     for arg in sys.argv[2:]:
         if arg.startswith('--error-type='):
             global_error_type = arg.split('=')[1]
         elif arg == '--cumulative':
             global_fit_on_cumulative = True
+        elif arg.startswith('--agg-bins='):
+            n_agg_bins = int(arg.split('=')[1])
+        elif arg.startswith('--fit-bins='):
+            n_fit_bins = int(arg.split('=')[1])
         elif not arg.startswith('--'):
             # Must be lorenz_types
             lorenz_types = arg.split(',')
@@ -402,6 +422,8 @@ if __name__ == '__main__':
                 lorenz_type,
                 global_error_type=global_error_type,
                 global_fit_on_cumulative=global_fit_on_cumulative,
+                n_agg_bins=n_agg_bins,
+                n_fit_bins=n_fit_bins,
             )
         except Exception as e:
             print(f"Error with configuration {lorenz_type}: {e}")
