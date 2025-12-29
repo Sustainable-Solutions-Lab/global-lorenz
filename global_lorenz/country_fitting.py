@@ -142,6 +142,12 @@ def fit_country_lorenz_curves(data_df, income_cols, lorenz_type):
                 'rmse': rmse,
                 'mafe': mafe,
                 'max_abs_error': max_abs_error,
+                'fractional_rmse': fractional_rmse,
+                'fractional_mafe': fractional_mafe,
+                'fractional_max_abs_error': fractional_max_abs_error,
+                'absolute_rmse': absolute_rmse,
+                'absolute_mafe': absolute_mafe,
+                'absolute_max_abs_error': absolute_max_abs_error,
             }
 
             # Add parameters
@@ -228,32 +234,21 @@ def evaluate_country_lorenz(row, income_thresholds, lorenz_type):
     # For each income threshold (as fraction of mean), find the population quantile
     # This requires inverting the derivative of the Lorenz curve
     # dL/dp = income at quantile p / mean income
-    
-    populations_below = []
-    
-    for threshold in income_thresholds:
-        # Search for p where dL/dp = threshold
-        # Use numerical search
-        p_values = np.linspace(0.001, 0.999, 1000)
-        dp = 0.001
-        
-        # Compute derivative numerically
-        derivatives = np.zeros(len(p_values))
-        for i, p in enumerate(p_values):
-            dL = lorenz_func(p + dp/2, *params) - lorenz_func(p - dp/2, *params)
-            derivatives[i] = dL / dp
-        
-        # Find where derivative crosses threshold
-        if threshold < derivatives[0]:
-            # Everyone below threshold
-            pop_below = 0.0
-        elif threshold > derivatives[-1]:
-            # Everyone above threshold
-            pop_below = 1.0
-        else:
-            # Interpolate
-            pop_below = np.interp(threshold, derivatives, p_values)
-        
-        populations_below.append(pop_below)
-    
-    return np.array(populations_below)
+
+    # Compute derivative grid ONCE for this country (not per threshold - major speedup!)
+    p_values = np.linspace(0.001, 0.999, 1000)
+    dp = 0.001
+
+    # Vectorized derivative computation
+    p_plus = p_values + dp/2
+    p_minus = p_values - dp/2
+    L_plus = lorenz_func(p_plus, *params)
+    L_minus = lorenz_func(p_minus, *params)
+    derivatives = (L_plus - L_minus) / dp
+
+    # Vectorized threshold lookup using numpy's interp (handles arrays)
+    income_thresholds = np.asarray(income_thresholds)
+    populations_below = np.interp(income_thresholds, derivatives, p_values,
+                                   left=0.0, right=1.0)
+
+    return populations_below

@@ -228,7 +228,13 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     absolute_max_abs_error : float
         Maximum absolute absolute error
     global_data : pandas DataFrame
-        Global income distribution data
+        Global income distribution data with columns:
+        - income_threshold: Income level (PPP dollars/year)
+        - population_below: Number of people below threshold
+        - population_fraction: Cumulative population fraction (actual, aggregated)
+        - income_below: Total income below threshold
+        - income_fraction: Cumulative income fraction (actual, aggregated)
+        - income_fraction_fitted: Cumulative income fraction (fitted Lorenz curve)
     """
     # Aggregate to global distribution
     global_data = aggregate_global_distribution(
@@ -287,6 +293,11 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     print(f"  RMSE: {absolute_rmse:.6f}")
     print(f"  MAFE: {absolute_mafe:.6f}")
     print(f"  Max absolute error: {absolute_max_abs_error:.6f}")
+
+    # Add fitted Lorenz curve values to global_data for comparison
+    global_data['income_fraction_fitted'] = global_lorenz_func(
+        global_data['population_fraction'].values, *global_params
+    )
 
     return (global_params, global_lorenz_func, global_gini,
             rmse, mafe, max_abs_error,
