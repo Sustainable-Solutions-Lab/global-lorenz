@@ -4,14 +4,15 @@ Fit global Lorenz curves to World Bank income distribution data.
 
 ## Features
 
-- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries using a fractional error objective that gives equal weight to all deciles
+- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries using a population-weighted fractional error objective that gives equal weight to all deciles
 - **Multiple functional forms**: Support for 5 different Lorenz curve types:
   - 1-parameter: Pareto (`pareto_1`)
   - 2-parameter: Ortega/Jantzen-Volpert (`ortega_2`)
   - 3-parameter: Generalized Quadratic (`gq_3`), Beta (`beta_3`), Sarabia (`sarabia_3`)
 - **Goodness-of-fit statistics**: RMSE, mean absolute fractional error, and maximum absolute fractional error for each country
 - **Global aggregation**: Aggregate country-level distributions to create a global income distribution
-- **Global Lorenz curve**: Fit a Lorenz curve to the aggregated global distribution
+- **Global Lorenz curve**: Fit a Lorenz curve to the aggregated global distribution using the same population-weighted methodology as country-level fitting
+- **Unified methodology**: Both country and global fits use the same fractional error objective, ensuring consistency across scales
 - **Comprehensive output**: CSV files include actual vs fitted decile shares, year, and fit quality metrics
 - **Poverty metrics**: Calculate global poverty headcount at various poverty lines
 
@@ -268,6 +269,31 @@ A Lorenz curve L(p) represents the cumulative proportion of income held by the b
 - L is concave: Income inequality means the curve lies below the diagonal
 - Gini coefficient = 1 - 2∫L(p)dp from 0 to 1
 
+### Unified Fitting Methodology
+
+Both country-level and global-level Lorenz curves are fitted using the same **population-weighted fractional error objective**:
+
+```
+Minimize: Σᵢ wᵢ · ((predicted_shareᵢ / actual_shareᵢ) - 1)²
+```
+
+Where:
+- `wᵢ` = population weight for bin i
+- `predicted_shareᵢ` = L(pᵢ₊₁) - L(pᵢ) from fitted curve
+- `actual_shareᵢ` = observed income share in bin i
+
+**Country-level fitting:**
+- Each decile has equal population weight (wᵢ = 0.1)
+- This gives equal importance to fitting all deciles, regardless of their absolute income size
+- Prevents the optimizer from only fitting large deciles well while ignoring small ones
+
+**Global-level fitting:**
+- Population weights vary by bin (wᵢ = pᵢ₊₁ - pᵢ)
+- Bins with more people receive higher weight in the objective
+- Ensures the global fit accurately represents where most of the world's population lives
+
+This unified approach ensures methodological consistency across scales while appropriately accounting for population distribution.
+
 ### Global Aggregation
 
 The global distribution is computed by:
@@ -277,6 +303,7 @@ The global distribution is computed by:
 3. Calculate the fraction of country population with income < y using the country Lorenz curve
 4. Sum across all countries weighted by population
 5. Result: global cumulative distribution function
+6. Fit global Lorenz curve to this distribution using population-weighted objective
 
 ### Applications
 

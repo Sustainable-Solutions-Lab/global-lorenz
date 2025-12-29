@@ -87,7 +87,7 @@ def plot_lorenz_curves(country_results, lorenz_type, output_dir):
 
 def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     """
-    Plot global Lorenz curve.
+    Plot global Lorenz curve (linear and log scales).
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -104,19 +104,20 @@ def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     elif lorenz_type == 'sarabia_3':
         lorenz_func = lorenz_sarabia_3
 
+    # Linear scale plot
     fig, ax = plt.subplots(figsize=(8, 8))
-    
+
     # Plot data points
     ax.scatter(p[::10], L[::10], c='red', s=30, alpha=0.5, label='Aggregated data', zorder=3)
-    
+
     # Plot fitted curve
     p_smooth = np.linspace(0, 1, 200)
     L_smooth = lorenz_func(p_smooth, *params)
     ax.plot(p_smooth, L_smooth, 'b-', label='Fitted global Lorenz curve', linewidth=2)
-    
+
     # Perfect equality line
     ax.plot([0, 1], [0, 1], 'k--', label='Perfect equality', alpha=0.5)
-    
+
     ax.set_xlabel('Cumulative population fraction', fontsize=12)
     ax.set_ylabel('Cumulative income fraction', fontsize=12)
     ax.set_title('Global Lorenz Curve', fontsize=14, fontweight='bold')
@@ -124,13 +125,45 @@ def plot_global_lorenz(p, L, params, lorenz_type, output_dir):
     ax.grid(True, alpha=0.3)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    
+
     plt.tight_layout()
     filename = f'global_lorenz_curve_{lorenz_type}.png'
     plt.savefig(output_dir / filename, dpi=300, bbox_inches='tight')
     plt.close()
 
     print(f"Saved global Lorenz curve to {output_dir / filename}")
+
+    # Log scale plot
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Plot data points (exclude zeros for log scale)
+    mask_data = L[::10] > 0
+    ax.scatter(p[::10][mask_data], L[::10][mask_data], c='red', s=30, alpha=0.5,
+               label='Aggregated data', zorder=3)
+
+    # Plot fitted curve (exclude zeros for log scale)
+    mask_smooth = L_smooth > 0
+    ax.plot(p_smooth[mask_smooth], L_smooth[mask_smooth], 'b-',
+            label='Fitted global Lorenz curve', linewidth=2)
+
+    # Perfect equality line
+    ax.plot([0, 1], [1e-6, 1], 'k--', label='Perfect equality', alpha=0.5)
+
+    ax.set_xlabel('Cumulative population fraction', fontsize=12)
+    ax.set_ylabel('Cumulative income fraction (log scale)', fontsize=12)
+    ax.set_title('Global Lorenz Curve (Log Scale)', fontsize=14, fontweight='bold')
+    ax.set_yscale('log')
+    ax.legend(fontsize=10)
+    ax.grid(True, alpha=0.3, which='both')
+    ax.set_xlim(0, 1)
+    ax.set_ylim(1e-6, 1)
+
+    plt.tight_layout()
+    filename_log = f'global_lorenz_curve_{lorenz_type}_log.png'
+    plt.savefig(output_dir / filename_log, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"Saved global Lorenz curve (log scale) to {output_dir / filename_log}")
 
 
 def run_workflow(input_file, income_cols, lorenz_type):
@@ -243,22 +276,43 @@ def run_workflow(input_file, income_cols, lorenz_type):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python main.py <input_file>")
-        print("\nExample: python main.py data/input/pip_2025-12-28.xlsx")
-        print("  (assumes columns named decile1, decile2, ..., decile10)")
+        print("Usage: python main.py <input_file> [lorenz_types]")
+        print("\nArguments:")
+        print("  input_file    : Path to Excel/CSV file with income distribution data")
+        print("  lorenz_types  : Optional comma-separated list of Lorenz curve types")
+        print("                  Options: pareto_1, ortega_2, gq_3, beta_3, sarabia_3")
+        print("                  Default: all five types")
+        print("\nExamples:")
+        print("  python main.py data/input/pip_2025-12-28.xlsx")
+        print("  python main.py data/input/pip_2025-12-28.xlsx beta_3")
+        print("  python main.py data/input/pip_2025-12-28.xlsx ortega_2,beta_3")
         sys.exit(1)
 
     input_file = sys.argv[1]
 
+    # Parse lorenz_types argument
+    if len(sys.argv) >= 3:
+        lorenz_types = sys.argv[2].split(',')
+    else:
+        lorenz_types = ['pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3']
+
+    # Validate lorenz_types
+    valid_types = ['pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3']
+    for lt in lorenz_types:
+        if lt not in valid_types:
+            print(f"Error: Invalid lorenz_type '{lt}'")
+            print(f"Valid options: {', '.join(valid_types)}")
+            sys.exit(1)
+
     # Use actual column names from World Bank PIP data
     income_cols = [f'decile{i}' for i in range(1, 11)]
-    
-    # Run workflow with different parameter configurations
+
+    # Run workflow with specified Lorenz curve forms
     print("\n" + "=" * 70)
-    print("Testing different Lorenz curve forms")
+    print(f"Fitting Lorenz curves: {', '.join(lorenz_types)}")
     print("=" * 70)
-    
-    for lorenz_type in ['pareto_1', 'ortega_2', 'gq_3', 'beta_3', 'sarabia_3']:
+
+    for lorenz_type in lorenz_types:
         print(f"\n\nConfiguration: {lorenz_type}")
         print("-" * 70)
 

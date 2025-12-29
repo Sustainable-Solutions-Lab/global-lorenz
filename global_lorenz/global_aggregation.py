@@ -51,7 +51,7 @@ def aggregate_global_distribution(country_results,
         income_thresholds = np.logspace(
             np.log10(min_income),
             np.log10(max_income),
-            100
+            1000
         )
     
     income_thresholds = np.asarray(income_thresholds)
@@ -147,6 +147,43 @@ def global_distribution_to_lorenz(global_data):
     return p, L
 
 
+def resample_to_equal_population_bins(p, L, n_bins=100):
+    """
+    Resample Lorenz curve data to equal-population bins.
+
+    This converts high-resolution (p, L) data with unequal bin sizes to
+    lower-resolution data with equal population bins, which works better
+    for fractional error fitting.
+
+    Parameters:
+    -----------
+    p : array
+        Cumulative population fractions (sorted, 0 to 1)
+    L : array
+        Cumulative income fractions (corresponding to p)
+    n_bins : int
+        Number of equal-population bins to create (default: 100)
+
+    Returns:
+    --------
+    income_shares : array
+        Income share in each bin (length n_bins)
+    population_shares : array
+        Population share in each bin (length n_bins, all equal to 1/n_bins)
+    """
+    # Create target population fractions at bin boundaries
+    p_target = np.linspace(0, 1, n_bins + 1)
+
+    # Interpolate L at target population fractions
+    L_target = np.interp(p_target, p, L)
+
+    # Compute income shares and population shares
+    income_shares = np.diff(L_target)
+    population_shares = np.diff(p_target)
+
+    return income_shares, population_shares
+
+
 def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
     """
     Fit a global Lorenz curve from country-level data.
@@ -180,16 +217,14 @@ def fit_global_lorenz(country_results, lorenz_type, income_thresholds):
         'population',
     )
 
-    # Convert to Lorenz curve format
+    # Convert to Lorenz curve format (high-resolution: ~1000 bins)
     p, L = global_distribution_to_lorenz(global_data)
 
-    # Convert (p, L) to income_shares and population_shares for unified fitting
-    # Income share for bin i = L[i+1] - L[i]
-    # Population share for bin i = p[i+1] - p[i]
-    income_shares = np.diff(L)
-    population_shares = np.diff(p)
+    # Resample to equal-population bins (10 bins = deciles, consistent with country-level)
+    # This avoids tiny bins at extremes that would dominate fractional error
+    income_shares, population_shares = resample_to_equal_population_bins(p, L, n_bins=10)
 
-    # Fit global Lorenz curve using unified function
+    # Fit global Lorenz curve using population-weighted fractional error
     from .lorenz_curves import fit_lorenz_curve_decile
     global_params, global_lorenz_func, global_gini, rmse, mafe, max_abs_error = fit_lorenz_curve_decile(
         income_shares, lorenz_type, population_shares
