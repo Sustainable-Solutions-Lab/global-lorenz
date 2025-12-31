@@ -246,6 +246,68 @@ country_results_beta = fit_country_lorenz_curves(
 )
 ```
 
+## Polynomial Fitting with Convex Combinations
+
+### Constrained Power Basis Functions
+
+An alternative approach uses a **convex combination of power basis functions** with optimized exponents. This method automatically guarantees convexity while achieving exceptional fit quality.
+
+**Form:**
+```
+L(p) = w₀·p^p₀ + w₁·p^p₁ + w₂·p^p₂ + w₃·p^p₃
+```
+
+**Constraints:**
+- Weights: wᵢ ≥ 0 and Σwᵢ = 1 (convex combination)
+- Powers: pᵢ > 1 (ensures each basis function is convex)
+- Boundary conditions: L(0) = 0 and L(1) = 1 (automatic)
+
+**Convexity guarantee:** A non-negative weighted sum of convex functions is convex, so L(p) is guaranteed to be convex on [0,1].
+
+### Best Fit (Degree 4)
+
+The optimal fit using 4 basis functions with both weights and powers optimized:
+
+```
+L(p) = 0.1599·p^1.500 + 0.3776·p^4.367 + 0.3671·p^14.072 + 0.0954·p^135.060
+```
+
+**Fit Quality:**
+- R² = 0.999979
+- RMSE = 0.001026
+- MAE = 0.000615
+- Gini coefficient = 0.6812 (empirical: 0.6809)
+
+**Analytical Gini Calculation:**
+
+For this functional form, the Gini coefficient has a closed-form solution:
+
+```
+Gini = 1 - 2∫₀¹ L(s) ds = 1 - 2·Σᵢ [wᵢ/(pᵢ + 1)]
+```
+
+For the degree 4 fit:
+```
+Gini = 1 - 2·[0.1599/2.500 + 0.3776/5.367 + 0.3671/15.072 + 0.0954/136.060]
+     = 1 - 2·[0.0639 + 0.0704 + 0.0244 + 0.0007]
+     = 1 - 2·[0.1594]
+     = 0.6812
+```
+
+### Fitting Tool
+
+To fit polynomials with convex combinations:
+
+```bash
+python fit_polynomial_lorenz.py --use-convex-combination --max-degree 6
+```
+
+This uses nested optimization:
+1. **Outer loop (nonlinear)**: Optimizes the power values pᵢ
+2. **Inner loop (linear)**: For given powers, finds optimal weights wᵢ via constrained least squares
+
+The method is superior to fixed linearly-spaced powers, finding optimal power placements including very high powers (e.g., p^135) that capture extreme inequality in the tail.
+
 ## Lorenz Curve Forms
 
 ### 1-Parameter Form: `lorenz_pareto_1` (Pareto Lorenz)
