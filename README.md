@@ -43,18 +43,68 @@ Primary data source: [World Bank Poverty and Inequality Platform (PIP) Poverty C
 
 The data is stored in the Excel file in `./data/input/`.
 
+## Data Preparation
+
+Both the polynomial and traditional approaches use the same data preparation pipeline.
+
+### Input Data Format
+
+The input file must be in World Bank Poverty and Inequality Platform (PIP) format with these columns:
+
+**Required columns:**
+- **`decile1` ... `decile10`**: Income share for each decile (poorest 10% to richest 10%)
+  - Values sum to 1.0 for each country-year observation
+  - `decile1` = poorest 10%, `decile10` = richest 10%
+- **`reporting_pop`**: Population for weighting
+- **`reporting_gdp`**: GDP in PPP-consistent units
+- **`country_name`**: Country name
+- **`reporting_year`**: Year of observation
+
+**Optional columns:**
+- **`reporting_pce`**: Private consumption expenditure (PPP-consistent)
+
+### Filtering to Most Recent Data
+
+When the input contains multiple years per country, the pipeline automatically:
+- Selects the most recent year with complete data (non-null values for all deciles, population, and GDP)
+- Ensures each country has exactly one observation
+
+This is performed by `filter_most_recent_complete()` from `global_lorenz.country_fitting`.
+
+### Creating the Empirical Distribution
+
+Before polynomial fitting, you must create the empirical global distribution:
+
+```bash
+python empirical_global_distribution.py
+```
+
+This script:
+- Loads raw data from `data/input/pip_2025-12-28.xlsx`
+- Filters to most recent complete data per country
+- Treats each country-decile as a step function (everyone earns the mean for that decile)
+- Aggregates across all countries to create global cumulative distribution
+- Saves to `data/output/empirical_distribution_global.csv` (input for polynomial fitting)
+- Calculates and reports empirical Gini coefficient
+
 ## Usage
 
 ### Primary Approach: Polynomial Fitting
 
-#### Quick Start
+#### Complete Workflow
 
+**Step 1: Create empirical distribution** (see [Data Preparation](#data-preparation))
+```bash
+python empirical_global_distribution.py
+```
+
+**Step 2: Fit polynomial curves**
 ```bash
 python fit_polynomial_lorenz.py --use-convex-combination --max-degree 6
 ```
 
 This will:
-- Load the most recent global Lorenz data from `data/output/`
+- Load the empirical global Lorenz data from `data/output/empirical_distribution_global.csv`
 - Fit polynomials with convex combinations for degrees 1 through 6
 - Optimize both weights (wᵢ) and exponents (pᵢ) using nested optimization
 - Generate output with fit statistics, parameters, and visualizations
@@ -135,49 +185,7 @@ python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute
 
 See the [Traditional Lorenz Curve Forms](#traditional-lorenz-curve-forms) section for details on the parametric forms.
 
-### Expected Data Format
-
-The input file should be in World Bank Poverty and Inequality Platform (PIP) format with the following columns:
-
-#### Distributional shares (deciles)
-
-**decile1 ... decile10**
-
-Share of total welfare accruing to each decile:
-- `decile1` = poorest 10%
-- `decile2` = second poorest 10%
-- ...
-- `decile10` = richest 10%
-
-These values sum to 1.0 for each country-year observation.
-
-#### Population & macro aggregates
-
-**reporting_pop**
-
-Population used to weight this country-year observation.
-
-**reporting_gdp**
-
-GDP associated with the reporting year (PPP-consistent).
-
-**reporting_pce**
-
-Private consumption expenditure (PPP-consistent).
-
-#### Other required columns
-
-**country_name**
-
-Name of the country.
-
-**reporting_year**
-
-Year of the data observation.
-
-### Data Filtering
-
-When the input data contains multiple years for each country, the script automatically selects the most recent year that has complete data (all decile columns, `reporting_pop`, and `reporting_gdp` are non-null)
+For input data format and filtering details, see the [Data Preparation](#data-preparation) section.
 
 ### Programmatic Usage (Alternative Approach)
 
