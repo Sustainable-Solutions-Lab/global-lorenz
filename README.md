@@ -1,23 +1,30 @@
-# Global Lorenz Curve Fitting
+# Global Lorenz Curves
 
-Fit global Lorenz curves to World Bank income distribution data.
+Construct empirical global Lorenz curves from World Bank income distribution data, with optional parametric curve fitting.
 
 ## Features
 
-- **Country-level Lorenz curve fitting**: Fit Lorenz curves to income distribution data for individual countries using a hybrid error objective that balances fitting quality across all income levels
-- **Multiple functional forms**: Support for 5 different Lorenz curve types:
+### Core Functionality
+
+- **Empirical global Lorenz curve construction**: Build high-resolution global income distribution by aggregating country-level data
+- **High-resolution aggregation**: Track global distribution at 1000 income thresholds, capturing detailed inequality patterns
+- **Population-weighted aggregation**: Correctly combine country distributions using both population and income data
+- **Equal-population resampling**: Convert to 100 percentile bins for stable analysis and visualization
+- **Comprehensive output**: CSV files with empirical global distribution data, visualization plots, and summary statistics
+- **Dual-scale visualization**: Linear and log-scale plots revealing inequality across entire income range
+- **Poverty metrics**: Calculate global poverty headcount at various poverty lines
+
+### Optional Parametric Fitting
+
+- **Country-level fitting**: Fit parametric Lorenz curves to individual countries to smooth data and enable interpolation
+- **Multiple functional forms**: 5 different Lorenz curve types available:
   - 1-parameter: Pareto (`pareto_1`)
   - 2-parameter: Ortega/Jantzen-Volpert (`ortega_2`)
   - 3-parameter: Generalized Quadratic (`gq_3`), Beta (`beta_3`), Sarabia (`sarabia_3`)
-- **Hybrid error objective**: Minimizes the product of absolute and relative errors, automatically balancing importance across poor and rich deciles without manual tuning
-- **Goodness-of-fit statistics**: RMSE, mean absolute error, and maximum absolute error for each country and global fit
-- **High-resolution global aggregation**: Aggregate country-level distributions at 1000 income thresholds, capturing detailed global income distribution
-- **Global Lorenz curve**: Resample to 100 equal-population bins and fit using hybrid error objective for balanced representation
-- **Unified methodology**: Both country and global fits use the same hybrid error objective, ensuring consistency across scales
-- **Comprehensive output**: CSV files include actual vs fitted decile shares, year, and fit quality metrics
-- **Dual-scale visualization**: Linear and log-scale plots of global Lorenz curves for detailed analysis
-- **Poverty metrics**: Calculate global poverty headcount at various poverty lines
-- **Flexible curve selection**: Run all 5 curve types or select specific ones via command-line arguments
+- **Global parametric fitting**: Fit smooth parametric curves to empirical global distribution
+- **Hybrid error objective**: Automatically balances fitting quality across poor and rich populations
+- **Goodness-of-fit statistics**: RMSE, mean absolute error, and maximum absolute error metrics
+- **Flexible selection**: Run all curve types or select specific ones via command-line arguments
 
 ## Installation
 
@@ -46,12 +53,15 @@ python main.py data/input/pip_2025-12-28.xlsx
 ```
 
 This will automatically:
-- Read data from World Bank PIP format (Excel or CSV)
+- Read income distribution data from World Bank PIP format (Excel or CSV)
 - Filter to the most recent year for each country with complete data
-- Fit all 5 Lorenz curve types (pareto_1, ortega_2, gq_3, beta_3, sarabia_3)
+- Construct empirical global Lorenz curve by aggregating country distributions
+- Optionally fit parametric curves (default: all 5 types) to smooth the data
 - Generate output in timestamped directories: `data/output/{lorenz_type}_{error_type}_{fit_method}_{timestamp}/`
 
-Each run tests all Lorenz curve types and saves results separately, allowing you to compare their performance.
+**Primary output**: High-resolution empirical global Lorenz curve with ~100 percentile bins
+
+**Secondary output**: Parametric curve fits for comparison and interpolation
 
 ### Command-Line Options
 
@@ -64,66 +74,65 @@ python main.py <input_file> [lorenz_types] [options]
 **Arguments:**
 
 - `input_file` (required): Path to Excel/CSV file with income distribution data
-- `lorenz_types` (optional): Comma-separated list of curve types to fit
+- `lorenz_types` (optional): Comma-separated list of parametric curve types to fit
   - Options: `pareto_1`, `ortega_2`, `gq_3`, `beta_3`, `sarabia_3`
   - Default: all five types
+  - **Note**: The empirical curve is always generated regardless of this setting
 
 **Options:**
 
-- `--error-type=TYPE` (optional): Error metric for global fitting
+- `--agg-bins=N` (optional): Number of bins for high-resolution empirical aggregation
+  - Default: `1000`
+  - Controls resolution of empirical global distribution
+- `--fit-bins=N` (optional): Number of equal-population bins for empirical curve output
+  - Default: `100`
+  - Controls number of percentile bins in final empirical curve
+- `--error-type=TYPE` (optional): Error metric for parametric curve fitting
   - Options: `hybrid`, `absolute`, `fractional`
   - Default: `hybrid`
-- `--cumulative` (optional): Fit global curve on cumulative L(p) values instead of income shares
+  - Only affects parametric fitting, not empirical curve
+- `--cumulative` (optional): Fit parametric curves on cumulative L(p) instead of income shares
   - Default: fit on income shares
-- `--agg-bins=N` (optional): Number of bins for high-resolution aggregation
-  - Default: `1000`
-- `--fit-bins=N` (optional): Number of equal-population bins for fitting
-  - Default: `100`
+  - Only affects parametric fitting, not empirical curve
 
 #### Examples
 
-**Fit specific Lorenz curve types:**
+**Basic empirical curve construction:**
 ```bash
-# Fit only beta_3
+# Generate empirical global Lorenz curve with default settings
+python main.py data/input/pip_2025-12-28.xlsx
+
+# Higher resolution empirical curve (2000 aggregation bins, 200 output bins)
+python main.py data/input/pip_2025-12-28.xlsx --agg-bins=2000 --fit-bins=200
+```
+
+**Parametric fitting options:**
+```bash
+# Fit only beta_3 parametric curve to empirical data
 python main.py data/input/pip_2025-12-28.xlsx beta_3
 
-# Fit ortega_2 and beta_3
+# Fit multiple specific parametric forms
 python main.py data/input/pip_2025-12-28.xlsx ortega_2,beta_3
-```
 
-**Change error metric for global fitting:**
-```bash
-# Use absolute error instead of hybrid
-python main.py data/input/pip_2025-12-28.xlsx ortega_2 --error-type=absolute
+# Use different error metric for parametric fitting
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute
 
-# Use fractional error
-python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=fractional
-```
-
-**Fit on cumulative L(p) values:**
-```bash
-# Fit beta_3 on cumulative L(p) with hybrid error
+# Fit parametric curves on cumulative L(p) values
 python main.py data/input/pip_2025-12-28.xlsx beta_3 --cumulative
-
-# Fit on cumulative L(p) with absolute error
-python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --cumulative
 ```
 
-**Customize number of bins:**
+**Combined options:**
 ```bash
-# Use 10 equal-population bins for fitting (deciles)
-python main.py data/input/pip_2025-12-28.xlsx beta_3 --fit-bins=10
+# High-resolution empirical curve with single parametric fit
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --agg-bins=2000 --fit-bins=200
 
-# Use 500 aggregation bins and 10 fitting bins
-python main.py data/input/pip_2025-12-28.xlsx beta_3 --agg-bins=500 --fit-bins=10
-
-# Combine with other options
-python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --fit-bins=10 --cumulative
+# All options combined
+python main.py data/input/pip_2025-12-28.xlsx beta_3 --error-type=absolute --cumulative --agg-bins=500 --fit-bins=50
 ```
 
-#### Fitting Strategies
+#### Parametric Fitting Strategies
 
-The package supports two orthogonal fitting dimensions for global Lorenz curves:
+When fitting parametric curves to the empirical distribution, the package supports two orthogonal dimensions:
 
 1. **Fitting Target** (what to fit):
    - **Income shares** (default): Minimizes errors on income in each bin (approximately fitting dL/dp)
@@ -134,14 +143,14 @@ The package supports two orthogonal fitting dimensions for global Lorenz curves:
    - **Absolute**: Minimizes absolute errors
    - **Fractional**: Minimizes relative/fractional errors
 
-These options are **orthogonal** - you can combine any fitting target with any error metric, giving you flexibility to optimize for different objectives:
+These options are **orthogonal** - you can combine any fitting target with any error metric:
 
 - **Default (shares + hybrid)**: Balanced fit across all income levels, good general-purpose choice
 - **Cumulative + hybrid**: Prevents error accumulation in L(p), good for applications using Lorenz curve values directly
 - **Shares + fractional**: Emphasizes relative accuracy in each bin
-- **Cumulative + absolute**: Minimizes absolute deviation of Lorenz curve from aggregated data
+- **Cumulative + absolute**: Minimizes absolute deviation of Lorenz curve from empirical data
 
-**Note:** Country-level fitting always uses income shares with hybrid error.
+**Note:** These options only affect parametric curve fitting. The empirical curve construction is always the same.
 
 ### Expected Data Format
 
@@ -189,6 +198,8 @@ When the input data contains multiple years for each country, the script automat
 
 ### Programmatic Usage
 
+#### Basic Empirical Curve Construction
+
 ```python
 from global_lorenz import (
     fit_country_lorenz_curves,
@@ -208,55 +219,54 @@ income_cols = [f'decile{i}' for i in range(1, 11)]
 # Filter to most recent complete data per country
 data_df = filter_most_recent_complete(raw_data, income_cols)
 
-# Fit country-level Lorenz curves (2-parameter form)
+# Fit country-level Lorenz curves to enable interpolation
+# This uses parametric curves to smooth country data
 country_results = fit_country_lorenz_curves(
     data_df,
     income_cols,
-    'ortega_2'
+    'ortega_2'  # 2-parameter form, good general-purpose choice
 )
 
-# Fit global Lorenz curve
+# Build empirical global Lorenz curve
+# This aggregates country distributions at high resolution
 global_params, global_lorenz_func, global_gini, global_data = fit_global_lorenz(
     country_results,
     'ortega_2',
     None
 )
 
-print(f"Global Gini coefficient: {global_gini:.4f}")
+# The empirical global distribution is in global_data
+# global_gini is calculated from the empirical distribution
+print(f"Global Gini coefficient (empirical): {global_gini:.4f}")
 ```
 
-### Using Different Curve Forms
+#### Optional: Parametric Fitting
 
-For 3-parameter fits, you can choose between three different forms:
+You can choose different parametric forms for country-level smoothing:
 
 ```python
-# Fit using Generalized Quadratic (implicit equation)
-country_results_gq = fit_country_lorenz_curves(
-    data_df,
-    income_cols,
-    'gq_3'
-)
+# 3-parameter forms provide more flexibility
 
-# Fit using Sarabia Ordered Family curve
-country_results_sarabia = fit_country_lorenz_curves(
-    data_df,
-    income_cols,
-    'sarabia_3'
-)
+# Generalized Quadratic (implicit equation)
+country_results_gq = fit_country_lorenz_curves(data_df, income_cols, 'gq_3')
 
-# Fit using Beta Lorenz curve
-country_results_beta = fit_country_lorenz_curves(
-    data_df,
-    income_cols,
-    'beta_3'
-)
+# Sarabia Ordered Family
+country_results_sarabia = fit_country_lorenz_curves(data_df, income_cols, 'sarabia_3')
+
+# Beta Lorenz curve
+country_results_beta = fit_country_lorenz_curves(data_df, income_cols, 'beta_3')
+
+# 1-parameter Pareto (least flexible)
+country_results_pareto = fit_country_lorenz_curves(data_df, income_cols, 'pareto_1')
 ```
 
-## Polynomial Fitting with Convex Combinations
+## Alternative Parametric Form: Polynomial with Convex Combinations
+
+This section describes an alternative parametric approach using polynomial basis functions instead of the traditional Lorenz curve forms.
 
 ### Constrained Power Basis Functions
 
-An alternative approach uses a **convex combination of power basis functions** with optimized exponents. This method automatically guarantees convexity while achieving exceptional fit quality.
+This approach uses a **convex combination of power basis functions** with optimized exponents. This method automatically guarantees convexity while achieving exceptional fit quality to the empirical distribution.
 
 **Form:**
 ```
@@ -314,7 +324,9 @@ This uses nested optimization:
 
 The method is superior to fixed linearly-spaced powers, finding optimal power placements including very high powers (e.g., p^135) that capture extreme inequality in the tail.
 
-## Lorenz Curve Forms
+## Parametric Lorenz Curve Forms
+
+This section describes the parametric functional forms available for optional country-level and global fitting. These provide smooth approximations to the empirical distributions.
 
 ### 1-Parameter Form: `lorenz_pareto_1` (Pareto Lorenz)
 
@@ -380,44 +392,52 @@ With constraints: 0 < a, b, c < 1
 
 The workflow generates timestamped output directories (e.g., `data/output/ortega_2_20251228-140106/`) containing:
 
-### Files Generated
+### Primary Output: Empirical Global Distribution
 
-1. **`country_results_{lorenz_type}.csv`**: Country-level fit results with columns:
+1. **`global_distribution_{lorenz_type}.csv`**: High-resolution empirical global Lorenz curve
+   - `population_fraction`: Cumulative population fraction (p)
+   - `income_fraction`: Cumulative income fraction L(p)
+   - `income_share`: Income share for each percentile bin
+   - Typically ~100 equal-population bins
+   - This is the core output - the empirical global income distribution
+
+2. **`global_lorenz_curve_{lorenz_type}.png`**: Visualization of empirical global Lorenz curve
+   - Shows both linear and log-scale views
+   - Reveals inequality patterns across entire income range
+   - Displays empirical Gini coefficient
+
+### Secondary Output: Parametric Fits
+
+3. **`country_results_{lorenz_type}.csv`**: Country-level parametric fit results with columns:
    - `country`: Country name
    - `year`: Reporting year for the data
    - `gini`: Gini coefficient
-   - `rmse`: Root mean squared fractional error
-   - `mafe`: Mean absolute fractional error
-   - `max_abs_error`: Maximum absolute fractional error across deciles
    - `param_1`, `param_2`, `param_3`: Fitted Lorenz curve parameters
    - `gdp`, `population`: Country economic data
    - `decile1_actual` ... `decile10_actual`: Input income shares
-   - `decile1_fitted` ... `decile10_fitted`: Predicted income shares from fitted curve
+   - `decile1_fitted` ... `decile10_fitted`: Predicted income shares from parametric curve
+   - `rmse`, `mafe`, `max_abs_error`: Goodness-of-fit statistics
 
-2. **`global_distribution_{lorenz_type}.csv`**: Global income distribution data
-
-3. **`country_lorenz_curves_{lorenz_type}.png`**: Sample country Lorenz curve plots
-
-4. **`global_lorenz_curve_{lorenz_type}.png`**: Fitted global Lorenz curve plot
+4. **`country_lorenz_curves_{lorenz_type}.png`**: Sample country parametric fit visualizations
 
 5. **`summary_report_{lorenz_type}.txt`**: Summary statistics including:
+   - Global Gini coefficient (from empirical distribution)
    - Country-level Gini statistics (mean, median)
-   - Country-level RMSE statistics (mean, std, min, max)
-   - Global Gini coefficient
-   - Fitted parameter values
+   - Country-level parametric fit quality (RMSE statistics)
+   - Parametric curve parameter values
 
-### Interpreting Goodness-of-Fit Statistics
+### Interpreting Parametric Fit Statistics
 
 All error metrics are **fractional (relative) errors**, not absolute errors:
 
 - **RMSE = 0.05**: ~5% root mean squared fractional error across deciles
-- **MAFE = 0.03**: On average, predicted decile shares differ from actual by 3%
+- **MAFE = 0.03**: On average, parametric predictions differ from actual by 3%
 - **max_abs_error = 0.15**: The worst-fit decile has 15% relative error
 
-**Example:** If a decile has actual share = 0.05 and predicted share = 0.055:
+**Example:** If a decile has actual share = 0.05 and fitted share = 0.055:
 - Fractional error = (0.055/0.05) - 1 = 0.10 (10% error)
 
-This fractional error objective gives **equal weight to all deciles** - fitting the small first decile (e.g., 2% of income) just as well as the large tenth decile (e.g., 30% of income).
+These statistics measure how well parametric curves approximate the country-level data. The empirical global distribution does not involve fitting and has no approximation error.
 
 ## Theory
 
@@ -430,60 +450,62 @@ A Lorenz curve L(p) represents the cumulative proportion of income held by the b
 - L is concave: Income inequality means the curve lies below the diagonal
 - Gini coefficient = 1 - 2∫L(p)dp from 0 to 1
 
-### Unified Fitting Methodology
+### Empirical Global Distribution Construction
 
-Both country-level and global-level Lorenz curves use a **hybrid error objective** that balances fitting quality across all income levels:
+The core methodology constructs an empirical global Lorenz curve by aggregating country-level distributions. This produces a high-resolution global income distribution without parametric assumptions.
 
+**Algorithm:**
+
+1. **High-resolution sampling**: Create 1000 income thresholds spanning the global income range (log-spaced)
+
+2. **Country-level interpolation**: For each income threshold y and each country c:
+   - Convert y to fraction of country mean income: y/μ_c
+   - Find population fraction below y using country's Lorenz curve (parametric or empirical)
+   - Find income fraction below y using country's Lorenz curve: L(p)
+   - Add to global totals: cumulative_pop += p_c × pop_c, cumulative_income += L(p_c) × income_c
+
+3. **Global Lorenz curve**: Normalize cumulative values to get global (p, L) with ~1000 data points
+
+4. **Equal-population resampling**: Convert to 100 equal-population bins (percentiles) for stable output
+
+5. **Gini calculation**: Compute global Gini coefficient directly from empirical distribution
+
+**Key features:**
+- **No parametric assumptions**: The global distribution is empirical, constructed by aggregation
+- **Population-weighted**: Correctly accounts for both population and income across countries
+- **High resolution**: 1000 thresholds capture detailed inequality patterns
+- **Numerically stable**: Equal-population bins avoid issues with tiny bins in tails
+
+### Optional: Parametric Fitting Methodology
+
+Parametric curves can be fitted at two levels:
+
+**Country-level fitting** (enables interpolation within countries):
+- Uses 10 equal-population bins (deciles) from input data
+- Fits parametric Lorenz curves to smooth and interpolate country distributions
+- Uses hybrid error objective that balances fitting quality across income levels
+
+**Hybrid error objective:**
 ```
 Minimize: Σᵢ population_shareᵢ · (predicted_shareᵢ - actual_shareᵢ)² / actual_shareᵢ
 ```
 
-This hybrid objective minimizes the **product of absolute and relative errors**, providing:
-- **Balanced importance**: Small income bins (poor deciles) are automatically upweighted, large bins (rich deciles) are downweighted
-- **Natural weighting**: No manual tuning needed - the division by `actual_shareᵢ` gives appropriate emphasis across the distribution
-- **Numerical stability**: Unlike pure fractional error, this avoids division-by-zero issues while still emphasizing fit quality for small bins
+This minimizes the **product of absolute and relative errors**:
+- **Balanced importance**: Automatically balances fitting quality across poor and rich populations
+- **Natural weighting**: Division by `actual_shareᵢ` emphasizes relative accuracy for small bins
+- **Numerical stability**: Avoids division-by-zero while emphasizing fit quality everywhere
 
 **Mathematical equivalence:**
 ```
 Hybrid error² = (absolute_error)² / actual_share
-              = [(predicted - actual) / actual]² × actual_share
               = (relative_error)² × actual_share
 ```
 
-**Key insight**: For equal-population bins, this is equivalent to **weighting the squared relative error by the income share in each bin**. This means:
-- Bins with more income (rich deciles) contribute more to the total error
-- Bins with less income (poor deciles) contribute less, but their relative errors are squared
-- The result is natural balance: fitting quality matters everywhere, but economic importance scales with income
-
-**Country-level fitting:**
-- Uses 10 equal-population bins (deciles)
-- Each decile has equal population weight (0.1)
-- Hybrid error ensures good fit across all income levels
-
-**Global-level fitting:**
-1. Aggregate country distributions at 1000 income thresholds
-2. Resample to 100 equal-population bins (percentiles) for fitting
-3. Apply hybrid error objective with population weighting
-4. Result: Balanced global fit that accurately represents both poor and rich populations
-
-### Global Aggregation
-
-The global distribution is computed by tracking both cumulative population and cumulative income:
-
-1. Create 1000 income thresholds spanning global income range (log-spaced)
-2. For each income threshold y and each country c:
-   - Convert y to fraction of country mean income: y/μ_c
-   - Find population fraction below y using country's fitted Lorenz curve
-   - Find income fraction below y using country's Lorenz curve: L(p)
-   - Add to global totals: cumulative_pop += p_c × pop_c, cumulative_income += L(p_c) × income_c
-3. Normalize to get global (p, L) Lorenz curve with ~1000 data points
-4. Resample to 100 equal-population bins (percentiles)
-5. Fit global Lorenz curve using hybrid error objective
-
-This approach correctly tracks the global income distribution by:
-- Using fitted country Lorenz curves to interpolate within each country
-- Aggregating both population AND income across countries
-- Resampling to equal-population bins to avoid numerical issues with tiny bins
+**Global parametric fitting** (optional smoothing):
+- Can fit parametric curves to the empirical global distribution
+- Uses the same hybrid error objective
+- Provides smooth functional form for interpolation and extrapolation
+- Secondary to the empirical distribution
 
 ### Applications
 
