@@ -31,6 +31,12 @@ Or install in development mode:
 pip install -e .
 ```
 
+## Data Source
+
+Primary data source: [World Bank Poverty and Inequality Platform (PIP) Poverty Calculator](https://pip.worldbank.org/poverty-calculator)
+
+The data is stored in the Excel file in `./data/input/`.
+
 ## Usage
 
 ### Quick Start
