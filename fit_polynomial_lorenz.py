@@ -100,6 +100,10 @@ def fit_convex_combination(x_data, y_data, degree, optimize_powers=True):
         final_weights = optimal_weights
         final_powers = optimal_powers
 
+    weight_sum = np.sum(final_weights)
+    if not np.isclose(weight_sum, 1.0, rtol=1e-10):
+        final_weights = final_weights / weight_sum
+
     def lorenz_model(p, params):
         """Evaluate L(p) with optimal powers and weights."""
         result = np.zeros_like(p, dtype=float)
@@ -561,6 +565,10 @@ def main():
             print(f"  Weights and powers (convex combination):")
             weights = [row[f'coeff_b{i}'] for i in range(degree)]
             powers = [row[f'coeff_b{i}'] for i in range(degree, 2*degree)]
+            weight_sum = sum(weights)
+            print(f"    Sum of weights:        {weight_sum:.15e}")
+            L_at_1 = sum(w * (1.0 ** p) for w, p in zip(weights, powers))
+            print(f"    L(1) = {L_at_1:.15e}  (should be 1.0)")
             for i in range(degree):
                 weight_str = "0" if abs(weights[i]) < 1e-12 else f"{weights[i]:.15e}"
                 print(f"    w_{i} = {weight_str:20s}  for p^{powers[i]:.6f}")
